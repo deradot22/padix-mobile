@@ -54,7 +54,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
-  me: () => request<MeResponse>('/api/auth/me'),
+  me: () => request<MeResponse>('/api/me'),
   upcomingEvents: () => request<Event[]>('/api/events/upcoming'),
   rating: () => request<Player[]>('/api/players/rating'),
 };
