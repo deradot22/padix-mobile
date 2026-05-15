@@ -8,6 +8,9 @@ import LoginScreen from '../screens/LoginScreen';
 import GamesScreen from '../screens/GamesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import RatingScreen from '../screens/RatingScreen';
+import EventDetailsScreen from '../screens/EventDetailsScreen';
+import CreateEventScreen from '../screens/CreateEventScreen';
+import RatingNotificationModal from '../components/RatingNotificationModal';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -39,6 +42,7 @@ function MainTabs() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.bgElevated },
         headerTintColor: colors.text,
+        headerTitleStyle: { fontWeight: '600' },
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
@@ -88,13 +92,32 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.bgElevated },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      >
         {user ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <>
+            <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="EventDetails"
+              component={EventDetailsScreen}
+              options={{ title: 'Игра' }}
+            />
+            <Stack.Screen
+              name="CreateEvent"
+              component={CreateEventScreen}
+              options={{ title: 'Создать игру' }}
+            />
+          </>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         )}
       </Stack.Navigator>
+      {user && <RatingNotificationModal />}
     </NavigationContainer>
   );
 }

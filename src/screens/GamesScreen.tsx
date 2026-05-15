@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
 import type { Event } from '../api/types';
 import { colors } from '../theme/colors';
@@ -21,13 +22,20 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'Отменена',
 };
 
+const statusColors: Record<string, string> = {
+  OPEN_FOR_REGISTRATION: colors.success,
+  IN_PROGRESS: colors.primary,
+  REGISTRATION_CLOSED: colors.warning,
+};
+
 export default function GamesScreen() {
+  const navigation = useNavigation<any>();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setError(null);
       const data = await api.upcomingEvents();
@@ -38,11 +46,9 @@ export default function GamesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    load();
   }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (loading) {
     return (
@@ -54,6 +60,13 @@ export default function GamesScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={() => navigation.navigate('CreateEvent')}
+      >
+        <Text style={styles.createBtnText}>+ Создать игру</Text>
+      </TouchableOpacity>
+
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
@@ -69,27 +82,38 @@ export default function GamesScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Text style={styles.empty}>
-              {error ?? 'Игр пока нет'}
-            </Text>
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>{error ?? 'Игр пока нет'}</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('EventDetails', { eventId: item.id })}
+          >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
+              <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+              <View
+                style={[
+                  styles.badge,
+                  { borderColor: statusColors[item.status] ?? colors.border },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeText,
+                    { color: statusColors[item.status] ?? colors.textMuted },
+                  ]}
+                >
                   {statusLabels[item.status] ?? item.status}
                 </Text>
               </View>
             </View>
             <Text style={styles.meta}>
-              {item.date} · {item.startTime?.slice(0, 5)}–{item.endTime?.slice(0, 5)}
+              📅 {item.date} · {item.startTime?.slice(0, 5)}–{item.endTime?.slice(0, 5)}
             </Text>
             <Text style={styles.meta}>
-              Игроков: {item.registeredCount} · Кортов: {item.courtsCount} · Раундов: {item.roundsPlanned}
+              👥 {item.registeredCount} · 🎾 {item.courtsCount} кортов · {item.roundsPlanned} раундов
             </Text>
           </TouchableOpacity>
         )}
@@ -99,19 +123,21 @@ export default function GamesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
   center: {
-    flex: 1,
+    flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg,
+  },
+  createBtn: {
+    margin: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
   },
-  list: {
-    padding: 16,
-  },
+  createBtnText: { color: '#000', fontSize: 15, fontWeight: '600' },
+  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  empty: { alignItems: 'center', padding: 32 },
+  emptyText: { color: colors.textDim, fontSize: 14 },
   card: {
     backgroundColor: colors.bgCard,
     borderRadius: 12,
@@ -134,24 +160,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   badge: {
-    backgroundColor: colors.bgElevated,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
   },
-  badgeText: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-  meta: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  empty: {
-    color: colors.textDim,
-    fontSize: 14,
-  },
+  badgeText: { fontSize: 11, fontWeight: '500' },
+  meta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
 });
