@@ -33,7 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await api.login(email, password);
     await setToken(res.token);
-    setUser(res.player);
+    const me = await api.me();
+    setUser(me);
   };
 
   const logout = async () => {

@@ -47,5 +47,4 @@ export type MeResponse = {
 
 export type LoginResponse = {
   token: string;
-  player: MeResponse;
 };
