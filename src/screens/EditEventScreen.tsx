@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -9,57 +9,76 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { api } from '../api/client';
 import type { PairingMode } from '../api/types';
 import { colors } from '../theme/colors';
 import { DateField, TimeField } from '../components/DateTimeField';
 
-function todayStr(): string {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
-}
+type EditEventRouteParams = {
+  EditEvent: { eventId: string };
+};
 
-export default function CreateEventScreen() {
-  const navigation = useNavigation<any>();
+export default function EditEventScreen() {
+  const navigation = useNavigation();
+  const route = useRoute<RouteProp<EditEventRouteParams, 'EditEvent'>>();
+  const { eventId } = route.params;
+
+  const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(todayStr());
-  const [startTime, setStartTime] = useState('19:00');
-  const [endTime, setEndTime] = useState('21:00');
-  const [courtsCount, setCourtsCount] = useState('2');
+  const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [courtsCount, setCourtsCount] = useState('');
+  const [pointsPerMatch, setPointsPerMatch] = useState('');
   const [pairingMode, setPairingMode] = useState<PairingMode>('ROUND_ROBIN');
-  const [roundsPlanned, setRoundsPlanned] = useState('6');
-  const [pointsPerMatch, setPointsPerMatch] = useState('21');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await api.eventDetails(eventId);
+        const e = d.event;
+        setTitle(e.title);
+        setDate(e.date);
+        setStartTime(e.startTime?.slice(0, 5) ?? '');
+        setEndTime(e.endTime?.slice(0, 5) ?? '');
+        setCourtsCount(String(e.courtsCount));
+        setPointsPerMatch(String(e.pointsPerPlayerPerMatch));
+        setPairingMode(e.pairingMode);
+      } catch (e: any) {
+        setError(e?.message ?? 'Ошибка загрузки');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [eventId]);
+
+  const handleSave = async () => {
     setError(null);
-    if (!title.trim()) { setError('Введите название'); return; }
     setSubmitting(true);
     try {
-      const event = await api.createEvent({
+      await api.updateEvent(eventId, {
         title: title.trim(),
         date,
         startTime,
         endTime,
-        format: 'AMERICANA',
-        pairingMode,
         courtsCount: parseInt(courtsCount, 10) || 1,
-        autoRounds: false,
-        roundsPlanned: parseInt(roundsPlanned, 10) || 1,
-        scoringMode: 'POINTS',
         pointsPerPlayerPerMatch: parseInt(pointsPerMatch, 10) || 21,
+        pairingMode,
       });
-      navigation.replace('EventDetails', { eventId: event.id });
+      navigation.goBack();
     } catch (e: any) {
-      setError(e?.message ?? 'Ошибка');
+      setError(e?.message ?? 'Ошибка сохранения');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
+  }
 
   return (
     <ScrollView
@@ -67,45 +86,31 @@ export default function CreateEventScreen() {
       contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Field label="Название" value={title} onChangeText={setTitle} placeholder="Вечерняя игра" />
+      <Field label="Название" value={title} onChangeText={setTitle} />
       <DateField label="Дата" value={date} onChange={setDate} />
-      <Row>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
         <TimeField label="Старт" value={startTime} onChange={setStartTime} />
         <TimeField label="Конец" value={endTime} onChange={setEndTime} />
-      </Row>
-      <Row>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
         <Field label="Кортов" value={courtsCount} onChangeText={setCourtsCount} keyboardType="number-pad" half />
-        <Field label="Раундов" value={roundsPlanned} onChangeText={setRoundsPlanned} keyboardType="number-pad" half />
-      </Row>
-      <Field
-        label="Очков на игрока в матче"
-        value={pointsPerMatch}
-        onChangeText={setPointsPerMatch}
-        keyboardType="number-pad"
-      />
+        <Field label="Очков" value={pointsPerMatch} onChangeText={setPointsPerMatch} keyboardType="number-pad" half />
+      </View>
 
-      <Text style={styles.label}>Режим распределения</Text>
+      <Text style={styles.label}>Режим пар</Text>
       <View style={styles.segment}>
-        <SegmentBtn
-          active={pairingMode === 'ROUND_ROBIN'}
-          label="Каждый с каждым"
-          onPress={() => setPairingMode('ROUND_ROBIN')}
-        />
-        <SegmentBtn
-          active={pairingMode === 'BALANCED'}
-          label="Равный бой"
-          onPress={() => setPairingMode('BALANCED')}
-        />
+        <Seg active={pairingMode === 'ROUND_ROBIN'} label="Каждый с каждым" onPress={() => setPairingMode('ROUND_ROBIN')} />
+        <Seg active={pairingMode === 'BALANCED'} label="Равный бой" onPress={() => setPairingMode('BALANCED')} />
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
 
       <TouchableOpacity
         style={[styles.submit, submitting && { opacity: 0.6 }]}
-        onPress={handleSubmit}
+        onPress={handleSave}
         disabled={submitting}
       >
-        {submitting ? <ActivityIndicator color="#000" /> : <Text style={styles.submitText}>Создать игру</Text>}
+        {submitting ? <ActivityIndicator color="#000" /> : <Text style={styles.submitText}>Сохранить</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -121,29 +126,22 @@ function Field({
         {...props}
         style={styles.input}
         placeholderTextColor={colors.textDim}
-        autoCapitalize="none"
       />
     </View>
   );
 }
 
-function Row({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', gap: 10 }}>{children}</View>;
-}
-
-function SegmentBtn({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+function Seg({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
-    <TouchableOpacity
-      style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-      onPress={onPress}
-    >
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+    <TouchableOpacity style={[styles.segBtn, active && styles.segBtnActive]} onPress={onPress}>
+      <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   fieldWrap: { marginBottom: 14 },
   label: { color: colors.textMuted, fontSize: 13, marginBottom: 6 },
   input: {
@@ -165,10 +163,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 18,
   },
-  segmentBtn: { flex: 1, paddingVertical: 10, borderRadius: 7, alignItems: 'center' },
-  segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { color: colors.textMuted, fontSize: 13 },
-  segmentTextActive: { color: '#000', fontWeight: '600' },
+  segBtn: { flex: 1, paddingVertical: 10, borderRadius: 7, alignItems: 'center' },
+  segBtnActive: { backgroundColor: colors.primary },
+  segText: { color: colors.textMuted, fontSize: 13 },
+  segTextActive: { color: '#000', fontWeight: '600' },
   submit: {
     backgroundColor: colors.primary,
     paddingVertical: 14,

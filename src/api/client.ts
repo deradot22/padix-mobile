@@ -162,10 +162,13 @@ export const api = {
     request(`/api/events/${eventId}/cancel/${playerId}/approve`, { method: 'POST' }),
   removePlayerFromEvent: (eventId: string, playerId: string) =>
     request(`/api/events/${eventId}/remove/${playerId}`, { method: 'POST' }),
-  submitScore: (matchId: string, points: { teamAPoints: number; teamBPoints: number }) =>
+  submitScore: (
+    matchId: string,
+    body: { points?: { teamAPoints: number; teamBPoints: number }; sets?: { teamAGames: number; teamBGames: number }[] },
+  ) =>
     request(`/api/events/matches/${matchId}/score`, {
       method: 'POST',
-      body: JSON.stringify({ points }),
+      body: JSON.stringify(body),
     }),
   saveDraftScore: (matchId: string, points: { teamAPoints: number; teamBPoints: number }) =>
     request(`/api/events/matches/${matchId}/draft-score`, {

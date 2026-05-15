@@ -10,7 +10,13 @@ import ProfileScreen from '../screens/ProfileScreen';
 import RatingScreen from '../screens/RatingScreen';
 import EventDetailsScreen from '../screens/EventDetailsScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
+import EditEventScreen from '../screens/EditEventScreen';
+import HistoryEventScreen from '../screens/HistoryEventScreen';
+import InvitesScreen from '../screens/InvitesScreen';
 import RatingNotificationModal from '../components/RatingNotificationModal';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
+import { api } from '../api/client';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -36,7 +42,21 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   );
 }
 
+function useInviteCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    let mounted = true;
+    const tick = () => api.invites().then((d) => { if (mounted) setCount(d.length); }).catch(() => {});
+    tick();
+    const id = setInterval(tick, 60000);
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') tick(); });
+    return () => { mounted = false; clearInterval(id); sub.remove(); };
+  }, []);
+  return count;
+}
+
 function MainTabs() {
+  const inviteCount = useInviteCount();
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -65,6 +85,15 @@ function MainTabs() {
         options={{
           title: 'Рейтинг',
           tabBarIcon: ({ focused }) => <TabIcon label="🏆" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Invites"
+        component={InvitesScreen}
+        options={{
+          title: 'Приглашения',
+          tabBarIcon: ({ focused }) => <TabIcon label="📨" focused={focused} />,
+          tabBarBadge: inviteCount > 0 ? inviteCount : undefined,
         }}
       />
       <Tabs.Screen
@@ -111,6 +140,16 @@ export default function RootNavigator() {
               name="CreateEvent"
               component={CreateEventScreen}
               options={{ title: 'Создать игру' }}
+            />
+            <Stack.Screen
+              name="EditEvent"
+              component={EditEventScreen}
+              options={{ title: 'Редактировать' }}
+            />
+            <Stack.Screen
+              name="HistoryEvent"
+              component={HistoryEventScreen}
+              options={{ title: 'Матчи' }}
             />
           </>
         ) : (

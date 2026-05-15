@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type {
@@ -20,8 +20,10 @@ import type {
 } from '../api/types';
 import { colors } from '../theme/colors';
 import RatingMiniChart from '../components/RatingMiniChart';
+import AvatarPicker from '../components/AvatarPicker';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { user, logout, refreshUser } = useAuth();
   const [history, setHistory] = useState<EventHistoryItem[]>([]);
   const [ratingHistory, setRatingHistory] = useState<RatingHistoryPoint[]>([]);
@@ -78,6 +80,11 @@ export default function ProfileScreen() {
       }
     >
       <View style={styles.card}>
+        <AvatarPicker
+          avatarUrl={user?.avatarUrl}
+          name={user?.name}
+          onUpdated={() => refreshUser()}
+        />
         <Text style={styles.name}>{user?.name}</Text>
         <Text style={styles.email}>{user?.email}</Text>
         {user?.publicId && (
@@ -117,7 +124,11 @@ export default function ProfileScreen() {
             <Text style={styles.empty}>Пока пусто</Text>
           ) : (
             history.slice(0, 30).map((h) => (
-              <View key={h.eventId} style={styles.historyRow}>
+              <TouchableOpacity
+                key={h.eventId}
+                style={styles.historyRow}
+                onPress={() => navigation.navigate('HistoryEvent', { eventId: h.eventId, eventTitle: h.eventTitle })}
+              >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.historyTitle} numberOfLines={1}>{h.eventTitle}</Text>
                   <Text style={styles.historyMeta}>
@@ -132,7 +143,7 @@ export default function ProfileScreen() {
                 >
                   {h.ratingDelta >= 0 ? '+' : ''}{h.ratingDelta}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -241,9 +252,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  name: { color: colors.text, fontSize: 22, fontWeight: '700' },
-  email: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  publicId: { color: colors.textDim, fontSize: 12, marginTop: 4 },
+  name: { color: colors.text, fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  email: { color: colors.textMuted, fontSize: 13, marginTop: 2, textAlign: 'center' },
+  publicId: { color: colors.textDim, fontSize: 12, marginTop: 4, textAlign: 'center' },
   statsRow: { flexDirection: 'row', marginTop: 16, gap: 10 },
   statBox: {
     flex: 1,

@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { EventDetails, Match, Round } from '../api/types';
 import { colors } from '../theme/colors';
 import ScoreInputModal from '../components/ScoreInputModal';
+import InviteFriendsModal from '../components/InviteFriendsModal';
 
 type EventRouteParams = {
   EventDetails: { eventId: string };
@@ -40,6 +41,7 @@ export default function EventDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scoreMatch, setScoreMatch] = useState<Match | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -144,6 +146,14 @@ export default function EventDetailsScreen() {
         {/* Author actions */}
         {data.isAuthor && (
           <View style={{ marginTop: 12 }}>
+            {(e.status === 'DRAFT' || e.status === 'OPEN_FOR_REGISTRATION' || e.status === 'REGISTRATION_CLOSED') && (
+              <ActionButton label="✎ Редактировать игру" disabled={busy}
+                onPress={() => (navigation as any).navigate('EditEvent', { eventId })} />
+            )}
+            {(e.status === 'OPEN_FOR_REGISTRATION' || e.status === 'REGISTRATION_CLOSED') && (
+              <ActionButton label="👥 Добавить друзей" disabled={busy}
+                onPress={() => setInviteOpen(true)} />
+            )}
             {e.status === 'OPEN_FOR_REGISTRATION' && (
               <ActionButton label="Закрыть регистрацию" disabled={busy}
                 onPress={() => action('Закрыть', () => api.closeRegistration(eventId))} />
@@ -172,6 +182,27 @@ export default function EventDetailsScreen() {
           </View>
         )}
 
+        {/* Pending cancel requests (author only) */}
+        {data.isAuthor && data.pendingCancelRequests.length > 0 && (
+          <View style={[styles.card, { marginTop: 16, borderColor: colors.warning }]}>
+            <Text style={[styles.sectionTitle, { color: colors.warning }]}>
+              Запросы на отмену ({data.pendingCancelRequests.length})
+            </Text>
+            {data.pendingCancelRequests.map((p) => (
+              <View key={p.id} style={styles.playerRow}>
+                <Text style={styles.playerName}>{p.name}</Text>
+                <TouchableOpacity
+                  onPress={() => confirm('Подтвердить отмену?', p.name,
+                    () => action('Отмена', () => api.approveCancel(eventId, p.id)))}
+                  style={styles.smallBtn}
+                >
+                  <Text style={[styles.smallBtnText, { color: colors.danger }]}>Подтвердить</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Registered players */}
         {data.registeredPlayers.length > 0 && (
           <View style={[styles.card, { marginTop: 16 }]}>
@@ -179,7 +210,18 @@ export default function EventDetailsScreen() {
             {data.registeredPlayers.map((p) => (
               <View key={p.id} style={styles.playerRow}>
                 <Text style={styles.playerName}>{p.name}</Text>
-                <Text style={styles.playerRating}>{p.rating}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.playerRating}>{p.rating}</Text>
+                  {data.isAuthor && p.id !== user?.playerId && e.status !== 'IN_PROGRESS' && e.status !== 'FINISHED' && (
+                    <TouchableOpacity
+                      onPress={() => confirm('Удалить игрока?', p.name,
+                        () => action('Удалить', () => api.removePlayerFromEvent(eventId, p.id)))}
+                      hitSlop={10}
+                    >
+                      <Text style={{ color: colors.danger, fontSize: 18 }}>×</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             ))}
           </View>
@@ -203,11 +245,22 @@ export default function EventDetailsScreen() {
 
       <ScoreInputModal
         match={scoreMatch}
+        scoringMode={e.scoringMode}
+        pointsPerPlayer={e.pointsPerPlayerPerMatch}
+        setsPerMatch={e.setsPerMatch || 3}
         onClose={() => setScoreMatch(null)}
         onSubmitted={async () => {
           setScoreMatch(null);
           await load();
         }}
+      />
+
+      <InviteFriendsModal
+        visible={inviteOpen}
+        eventId={eventId}
+        excludeIds={data.registeredPlayers.map((p) => p.id)}
+        onClose={() => setInviteOpen(false)}
+        onChanged={load}
       />
     </>
   );
@@ -362,4 +415,12 @@ const styles = StyleSheet.create({
   },
   tapHint: { color: colors.textDim, fontSize: 11, textAlign: 'center', marginTop: 4 },
   deleteRound: { color: colors.danger, fontSize: 12 },
+  smallBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  smallBtnText: { fontSize: 12, fontWeight: '600' },
 });
