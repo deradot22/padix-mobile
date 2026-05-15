@@ -13,6 +13,8 @@ import CreateEventScreen from '../screens/CreateEventScreen';
 import EditEventScreen from '../screens/EditEventScreen';
 import HistoryEventScreen from '../screens/HistoryEventScreen';
 import InvitesScreen from '../screens/InvitesScreen';
+import SurveyScreen from '../screens/SurveyScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import RatingNotificationModal from '../components/RatingNotificationModal';
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -128,7 +130,9 @@ export default function RootNavigator() {
           headerTitleStyle: { fontWeight: '600' },
         }}
       >
-        {user ? (
+        {user && !user.surveyCompleted ? (
+          <Stack.Screen name="Survey" component={SurveyScreen} options={{ headerShown: false }} />
+        ) : user ? (
           <>
             <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen
@@ -150,6 +154,11 @@ export default function RootNavigator() {
               name="HistoryEvent"
               component={HistoryEventScreen}
               options={{ title: 'Матчи' }}
+            />
+            <Stack.Screen
+              name="EditProfile"
+              component={EditProfileScreen}
+              options={{ title: 'Профиль' }}
             />
           </>
         ) : (

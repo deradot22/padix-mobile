@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -25,6 +26,15 @@ export default function InviteFriendsModal({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return friends;
+    return friends.filter((f) =>
+      f.name.toLowerCase().includes(q) || f.publicId.toLowerCase().includes(q)
+    );
+  }, [friends, query]);
 
   useEffect(() => {
     if (!visible) return;
@@ -73,8 +83,17 @@ export default function InviteFriendsModal({
           {loading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
           ) : (
-            <FlatList
-              data={friends}
+            <>
+              <TextInput
+                style={styles.search}
+                placeholder="Поиск по имени или ID"
+                placeholderTextColor={colors.textDim}
+                value={query}
+                onChangeText={setQuery}
+                autoCapitalize="none"
+              />
+              <FlatList
+                data={filtered}
               keyExtractor={(f) => f.userId}
               ListEmptyComponent={<Text style={styles.empty}>Нет друзей</Text>}
               renderItem={({ item }) => {
@@ -109,7 +128,8 @@ export default function InviteFriendsModal({
                   </View>
                 );
               }}
-            />
+              />
+            </>
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -133,7 +153,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: colors.border,
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  search: {
+    backgroundColor: colors.bgCard,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 14,
+    marginBottom: 8,
+  },
   title: { color: colors.text, fontSize: 17, fontWeight: '600' },
   close: { color: colors.textMuted, fontSize: 22 },
   row: {

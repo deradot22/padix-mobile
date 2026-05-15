@@ -12,7 +12,7 @@ import {
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { EventDetails, Match, Round } from '../api/types';
+import type { EventDetails, EventInviteStatusItem, Match, Round } from '../api/types';
 import { colors } from '../theme/colors';
 import ScoreInputModal from '../components/ScoreInputModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
@@ -37,6 +37,7 @@ export default function EventDetailsScreen() {
   const { eventId } = route.params;
 
   const [data, setData] = useState<EventDetails | null>(null);
+  const [invites, setInvites] = useState<EventInviteStatusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,14 @@ export default function EventDetailsScreen() {
       setError(null);
       const d = await api.eventDetails(eventId);
       setData(d);
+      if (d.isAuthor) {
+        try {
+          const inv = await api.eventInvites(eventId);
+          setInvites(inv);
+        } catch {
+          setInvites([]);
+        }
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Не удалось загрузить игру');
     } finally {
@@ -166,6 +175,9 @@ export default function EventDetailsScreen() {
               <>
                 <ActionButton label="+ Добавить раунд" disabled={busy}
                   onPress={() => action('Добавить раунд', () => api.addRound(eventId))} />
+                <ActionButton label="🏆 Финальный раунд" disabled={busy}
+                  onPress={() => confirm('Финальный раунд?', 'Сильные vs сильные.',
+                    () => action('Финал', () => api.addFinalRound(eventId)))} />
                 <ActionButton label="Завершить игру" tone="warning" disabled={busy}
                   onPress={() => confirm('Завершить игру?', 'После этого начислится рейтинг.',
                     () => action('Финиш', () => api.finishEvent(eventId)))} />
@@ -227,20 +239,48 @@ export default function EventDetailsScreen() {
           </View>
         )}
 
+        {/* Sent invites */}
+        {data.isAuthor && invites.length > 0 && (
+          <View style={[styles.card, { marginTop: 16 }]}>
+            <Text style={styles.sectionTitle}>Приглашения ({invites.length})</Text>
+            {invites.map((inv) => {
+              const color =
+                inv.status === 'ACCEPTED' ? colors.success :
+                inv.status === 'DECLINED' ? colors.danger : colors.warning;
+              const label =
+                inv.status === 'ACCEPTED' ? 'принято' :
+                inv.status === 'DECLINED' ? 'отклонено' : 'ожидает';
+              return (
+                <View key={inv.publicId} style={styles.playerRow}>
+                  <Text style={styles.playerName}>{inv.name}</Text>
+                  <Text style={{ color, fontSize: 12 }}>{label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Rounds */}
-        {data.rounds.map((r) => (
-          <RoundCard
-            key={r.id}
-            round={r}
-            canSubmitScore={canSubmitScore}
-            isAuthor={data.isAuthor}
-            onScorePress={(m) => setScoreMatch(m)}
-            onDeleteRound={() =>
-              confirm('Удалить раунд?', `Раунд ${r.roundNumber}`,
-                () => action('Удалить раунд', () => api.deleteRound(eventId, r.id)))
-            }
-          />
-        ))}
+        {(() => {
+          // Active round = the lowest round number with any non-finished match (while IN_PROGRESS)
+          const activeRoundId = e.status === 'IN_PROGRESS'
+            ? data.rounds.find((r) => r.matches.some((m) => m.status !== 'FINISHED'))?.id ?? null
+            : null;
+          return data.rounds.map((r) => (
+            <RoundCard
+              key={r.id}
+              round={r}
+              isActive={r.id === activeRoundId}
+              canSubmitScore={canSubmitScore}
+              isAuthor={data.isAuthor}
+              onScorePress={(m) => setScoreMatch(m)}
+              onDeleteRound={() =>
+                confirm('Удалить раунд?', `Раунд ${r.roundNumber}`,
+                  () => action('Удалить раунд', () => api.deleteRound(eventId, r.id)))
+              }
+            />
+          ));
+        })()}
       </ScrollView>
 
       <ScoreInputModal
@@ -268,12 +308,14 @@ export default function EventDetailsScreen() {
 
 function RoundCard({
   round,
+  isActive,
   canSubmitScore,
   isAuthor,
   onScorePress,
   onDeleteRound,
 }: {
   round: Round;
+  isActive: boolean;
   canSubmitScore: boolean;
   isAuthor: boolean;
   onScorePress: (m: Match) => void;
@@ -281,9 +323,20 @@ function RoundCard({
 }) {
   const allFinished = round.matches.every((m) => m.status === 'FINISHED');
   return (
-    <View style={[styles.card, { marginTop: 16 }]}>
+    <View style={[
+      styles.card,
+      { marginTop: 16 },
+      isActive && { borderColor: colors.primary, borderWidth: 2 },
+    ]}>
       <View style={styles.headRow}>
-        <Text style={styles.sectionTitle}>Раунд {round.roundNumber}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.sectionTitle}>Раунд {round.roundNumber}</Text>
+          {isActive && (
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeBadgeText}>● сейчас</Text>
+            </View>
+          )}
+        </View>
         {isAuthor && !allFinished && (
           <TouchableOpacity onPress={onDeleteRound}>
             <Text style={styles.deleteRound}>удалить</Text>
@@ -423,4 +476,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   smallBtnText: { fontSize: 12, fontWeight: '600' },
+  activeBadge: {
+    backgroundColor: 'rgba(16,185,129,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  activeBadgeText: { color: colors.primary, fontSize: 10, fontWeight: '600' },
 });

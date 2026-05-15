@@ -177,3 +177,13 @@ export type RatingNotification = {
 export type LoginResponse = {
   token: string;
 };
+
+export type SurveyOption = { id: string; label: string };
+export type SurveyQuestion = { id: string; title: string; options: SurveyOption[] };
+export type SurveyLevelCard = { id: string; title: string; level: number; bullets: string[] };
+export type SurveyDef = {
+  id: string;
+  version: number;
+  levelCards: SurveyLevelCard[];
+  questions: SurveyQuestion[];
+};

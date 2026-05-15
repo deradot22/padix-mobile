@@ -215,6 +215,13 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      <TouchableOpacity
+        style={[styles.logout, { borderColor: colors.border, marginTop: 16 }]}
+        onPress={() => navigation.navigate('EditProfile')}
+      >
+        <Text style={[styles.logoutText, { color: colors.text }]}>Редактировать профиль</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.logout} onPress={logout}>
         <Text style={styles.logoutText}>Выйти</Text>
       </TouchableOpacity>

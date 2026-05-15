@@ -14,6 +14,7 @@ import type {
   Player,
   RatingHistoryPoint,
   RatingNotification,
+  SurveyDef,
 } from './types';
 
 let cachedToken: string | null = null;
@@ -215,4 +216,9 @@ export const api = {
     request(`/api/events/${eventId}/invite`, { method: 'POST', body: JSON.stringify({ publicId }) }),
   addFriendToEvent: (eventId: string, publicId: string) =>
     request(`/api/events/${eventId}/add-friend`, { method: 'POST', body: JSON.stringify({ publicId }) }),
+
+  // Survey
+  getSurvey: () => request<SurveyDef>('/api/survey/current'),
+  submitSurvey: (payload: { version: number; answers: Record<string, string> }) =>
+    request('/api/survey/submit', { method: 'POST', body: JSON.stringify(payload) }),
 };

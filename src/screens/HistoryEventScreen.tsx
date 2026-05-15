@@ -8,8 +8,9 @@ import {
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { api } from '../api/client';
-import type { EventHistoryMatch } from '../api/types';
+import type { EventHistoryMatch, MatchPlayerInfo } from '../api/types';
 import { colors } from '../theme/colors';
+import PlayerAvatar from '../components/PlayerAvatar';
 
 type HistoryEventRouteParams = {
   HistoryEvent: { eventId: string; eventTitle?: string };
@@ -89,14 +90,8 @@ export default function HistoryEventScreen() {
               )}
             </View>
 
-            <View style={styles.teamRow}>
-              <Text style={styles.teamLabel}>Вы:</Text>
-              <Text style={styles.teamText}>{m.teamText}</Text>
-            </View>
-            <View style={styles.teamRow}>
-              <Text style={styles.teamLabel}>Соп.:</Text>
-              <Text style={styles.teamText}>{m.opponentText}</Text>
-            </View>
+            <TeamLine label="Вы:" players={m.teamPlayers} fallback={m.teamText} />
+            <TeamLine label="Соп.:" players={m.opponentPlayers} fallback={m.opponentText} />
 
             {m.score && (
               <Text
@@ -113,6 +108,32 @@ export default function HistoryEventScreen() {
         );
       })}
     </ScrollView>
+  );
+}
+
+function TeamLine({
+  label, players, fallback,
+}: { label: string; players?: MatchPlayerInfo[]; fallback: string }) {
+  if (!players || players.length === 0) {
+    return (
+      <View style={styles.teamRow}>
+        <Text style={styles.teamLabel}>{label}</Text>
+        <Text style={styles.teamText}>{fallback}</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.teamRow}>
+      <Text style={styles.teamLabel}>{label}</Text>
+      <View style={styles.teamPlayersRow}>
+        {players.map((p, idx) => (
+          <View key={idx} style={styles.teamPlayer}>
+            <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={22} />
+            <Text style={styles.teamPlayerName}>{p.name}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -148,9 +169,12 @@ const styles = StyleSheet.create({
   },
   round: { color: colors.textDim, fontSize: 12 },
   delta: { fontSize: 14, fontWeight: '700' },
-  teamRow: { flexDirection: 'row', alignItems: 'baseline', marginVertical: 2 },
+  teamRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
   teamLabel: { color: colors.textDim, fontSize: 12, width: 50 },
   teamText: { color: colors.text, fontSize: 13, flex: 1 },
+  teamPlayersRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  teamPlayer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  teamPlayerName: { color: colors.text, fontSize: 13 },
   score: {
     color: colors.text,
     fontSize: 16,

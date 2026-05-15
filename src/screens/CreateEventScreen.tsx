@@ -29,6 +29,7 @@ export default function CreateEventScreen() {
   const [startTime, setStartTime] = useState('19:00');
   const [endTime, setEndTime] = useState('21:00');
   const [courtsCount, setCourtsCount] = useState('2');
+  const [courtNames, setCourtNames] = useState<string[]>(['', '']);
   const [pairingMode, setPairingMode] = useState<PairingMode>('ROUND_ROBIN');
   const [roundsPlanned, setRoundsPlanned] = useState('6');
   const [pointsPerMatch, setPointsPerMatch] = useState('21');
@@ -40,6 +41,8 @@ export default function CreateEventScreen() {
     if (!title.trim()) { setError('Введите название'); return; }
     setSubmitting(true);
     try {
+      const cc = parseInt(courtsCount, 10) || 1;
+      const names = courtNames.slice(0, cc).map((n) => n.trim()).filter(Boolean);
       const event = await api.createEvent({
         title: title.trim(),
         date,
@@ -47,7 +50,8 @@ export default function CreateEventScreen() {
         endTime,
         format: 'AMERICANA',
         pairingMode,
-        courtsCount: parseInt(courtsCount, 10) || 1,
+        courtsCount: cc,
+        courtNames: names.length === cc ? names : undefined,
         autoRounds: false,
         roundsPlanned: parseInt(roundsPlanned, 10) || 1,
         scoringMode: 'POINTS',
@@ -74,9 +78,36 @@ export default function CreateEventScreen() {
         <TimeField label="Конец" value={endTime} onChange={setEndTime} />
       </Row>
       <Row>
-        <Field label="Кортов" value={courtsCount} onChangeText={setCourtsCount} keyboardType="number-pad" half />
+        <Field
+          label="Кортов"
+          value={courtsCount}
+          onChangeText={(v) => {
+            setCourtsCount(v);
+            const cc = parseInt(v, 10) || 0;
+            setCourtNames((prev) => {
+              const next = [...prev];
+              while (next.length < cc) next.push('');
+              return next.slice(0, cc);
+            });
+          }}
+          keyboardType="number-pad"
+          half
+        />
         <Field label="Раундов" value={roundsPlanned} onChangeText={setRoundsPlanned} keyboardType="number-pad" half />
       </Row>
+
+      <Text style={styles.label}>Имена кортов (необязательно)</Text>
+      {Array.from({ length: parseInt(courtsCount, 10) || 0 }).map((_, i) => (
+        <View key={i} style={[styles.fieldWrap, { marginBottom: 8 }]}>
+          <TextInput
+            style={styles.input}
+            placeholder={`Корт ${i + 1}`}
+            placeholderTextColor={colors.textDim}
+            value={courtNames[i] ?? ''}
+            onChangeText={(v) => setCourtNames((p) => p.map((x, j) => (j === i ? v : x)))}
+          />
+        </View>
+      ))}
       <Field
         label="Очков на игрока в матче"
         value={pointsPerMatch}
