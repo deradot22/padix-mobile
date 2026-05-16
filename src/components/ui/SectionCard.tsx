@@ -37,14 +37,12 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(34,197,94,0.12)',
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { color: colors.text, fontSize: 17, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  title: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   body: { marginTop: 14 },
 });

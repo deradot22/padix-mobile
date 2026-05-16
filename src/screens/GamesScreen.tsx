@@ -123,26 +123,32 @@ export default function GamesScreen() {
         }
       />
 
-      <View style={styles.toggle}>
-        <ToggleBtn
-          active={view === 'list'}
-          label="Игры"
-          icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
-          onPress={() => setView('list')}
-        />
-        <ToggleBtn
-          active={view === 'calendar'}
-          label="Календарь"
-          icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
-          onPress={() => setView('calendar')}
-        />
+      <View style={styles.toggleWrap}>
+        <View style={styles.toggle}>
+          <ToggleBtn
+            active={view === 'list'}
+            label="Игры"
+            icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
+            onPress={() => setView('list')}
+          />
+          <ToggleBtn
+            active={view === 'calendar'}
+            label="Календарь"
+            icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
+            onPress={() => setView('calendar')}
+          />
+        </View>
       </View>
 
       {view === 'list' ? (
         <SectionCard
           icon={<Calendar size={18} color={colors.primary} />}
           title="Ближайшие игры (2 недели)"
-          subtitle={`${events.length} ${events.length === 1 ? 'игра' : 'игр'}`}
+          right={
+            <View style={styles.hintRow}>
+              <Text style={styles.hintText}>Нажми на игру</Text>
+            </View>
+          }
         >
           {events.length === 0 ? (
             <Text style={styles.empty}>{error ?? 'Ближайших игр нет'}</Text>
@@ -319,6 +325,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
+  toggleWrap: { alignItems: 'flex-end', marginBottom: 16 },
   toggle: {
     flexDirection: 'row',
     backgroundColor: 'rgba(54,54,54,0.3)',
@@ -326,14 +333,13 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 16,
   },
   toggleBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radii.md,
   },
@@ -343,6 +349,8 @@ const styles = StyleSheet.create({
 
   empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', padding: 12 },
 
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hintText: { color: colors.textMuted, fontSize: 11 },
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
