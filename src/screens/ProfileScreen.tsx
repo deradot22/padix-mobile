@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,8 +13,10 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
-  ChevronDown, ChevronRight, History, Settings, TrendingUp, Users, LogOut, UserPlus,
+  Calendar, ChevronDown, ChevronRight, Clock, Gamepad2, Mail, Pencil,
+  TrendingUp, Trophy, UserPlus, Users, LogOut,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type {
@@ -23,12 +26,14 @@ import type {
 } from '../api/types';
 import { colors, radii } from '../theme/colors';
 import { PageHeader } from '../components/ui/PageHeader';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { Card } from '../components/ui/Card';
+import { SectionCard } from '../components/ui/SectionCard';
+import { PillBadge } from '../components/ui/PillBadge';
 import RatingMiniChart from '../components/RatingMiniChart';
-import AvatarPicker from '../components/AvatarPicker';
 import PlayerAvatar from '../components/PlayerAvatar';
+
+const CALIBRATION_TARGET = 30;
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -40,6 +45,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openSection, setOpenSection] = useState<'history' | 'friends' | null>(null);
   const [friendPublicId, setFriendPublicId] = useState('');
+  const [busyAvatar, setBusyAvatar] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +66,28 @@ export default function ProfileScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const pickAvatar = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.[0]?.base64) return;
+      setBusyAvatar(true);
+      await api.updateAvatar(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      await refreshUser();
+    } catch (e: any) {
+      Alert.alert('Аватар', e?.message ?? 'Ошибка');
+    } finally {
+      setBusyAvatar(false);
+    }
+  };
+
   const sendFriendRequest = async () => {
     if (!friendPublicId.trim()) return;
     try {
@@ -75,6 +103,12 @@ export default function ProfileScreen() {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   }
 
+  const calibProgress = user
+    ? Math.min(1, ((CALIBRATION_TARGET - (user.calibrationMatchesRemaining ?? 0)) / CALIBRATION_TARGET))
+    : 0;
+  const isCalibrating = (user?.calibrationMatchesRemaining ?? 0) > 0;
+  const matchesPlayed = CALIBRATION_TARGET - (user?.calibrationMatchesRemaining ?? CALIBRATION_TARGET);
+
   return (
     <ScrollView
       style={styles.container}
@@ -89,75 +123,232 @@ export default function ProfileScreen() {
     >
       <PageHeader title="Профиль" />
 
-      {/* Identity card */}
-      <Card style={{ padding: 20, alignItems: 'center', marginBottom: 16 }}>
-        <AvatarPicker
-          avatarUrl={user?.avatarUrl}
-          name={user?.name}
-          onUpdated={() => refreshUser()}
-        />
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-        {user?.publicId && (
-          <View style={styles.publicIdRow}>
-            <Text style={styles.publicIdLabel}>ID:</Text>
-            <Text style={styles.publicIdValue}>{user.publicId}</Text>
-          </View>
-        )}
-
-        <View style={styles.statsRow}>
-          <Stat label="Рейтинг" value={String(user?.rating ?? 0)} accent />
-          <Stat label="NTRP" value={user?.ntrp ?? '—'} />
-          <Stat label="Матчей" value={String(user?.gamesPlayed ?? 0)} />
+      {/* Profile card with cover banner */}
+      <View style={styles.profileCard}>
+        <View style={styles.cover}>
+          <View style={styles.coverGradient} />
         </View>
 
-        {(user?.calibrationMatchesRemaining ?? 0) > 0 && (
-          <View style={styles.calibBox}>
-            <TrendingUp size={14} color={colors.warningFg} />
-            <Text style={styles.calibText}>
-              Калибровка: ещё {user?.calibrationMatchesRemaining} матчей
-            </Text>
-          </View>
-        )}
+        <View style={styles.profileBody}>
+          <View style={styles.identityRow}>
+            <TouchableOpacity
+              onPress={pickAvatar}
+              style={styles.avatarWrap}
+              disabled={busyAvatar}
+            >
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarInitial}>
+                  {(user?.name?.trim()?.[0] ?? '?').toUpperCase()}
+                </Text>
+              )}
+              {busyAvatar && (
+                <View style={styles.avatarBusy}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onPress={() => navigation.navigate('EditProfile')}
-          style={{ marginTop: 14 }}
-          leftIcon={<Settings size={14} color={colors.text} />}
-        >
-          Изменить
-        </Button>
-      </Card>
+            <View style={{ flex: 1, marginLeft: 14, paddingTop: 28 }}>
+              <Text style={styles.name}>{user?.name}</Text>
+              <View style={styles.emailRow}>
+                <Mail size={12} color={colors.textMuted} />
+                <Text style={styles.email}>{user?.email}</Text>
+              </View>
+            </View>
+          </View>
+
+          <Button
+            variant="outline"
+            fullWidth
+            onPress={() => navigation.navigate('EditProfile')}
+            leftIcon={<Pencil size={14} color={colors.text} />}
+            style={{ marginTop: 14 }}
+          >
+            Редактировать профиль
+          </Button>
+
+          <View style={styles.pillsRow}>
+            {isCalibrating ? (
+              <PillBadge icon={<Trophy size={12} color={colors.primary} />} tone="primary">
+                на калибровке
+              </PillBadge>
+            ) : (
+              <PillBadge icon={<Trophy size={12} color={colors.warningFg} />} tone="amber" filled>
+                {user?.rating}
+              </PillBadge>
+            )}
+            <PillBadge icon={<Gamepad2 size={12} color={colors.primary} />} tone="primary">
+              {user?.gamesPlayed ?? 0} матчей
+            </PillBadge>
+          </View>
+
+          <View style={[styles.pillsRow, { marginTop: 8 }]}>
+            {user?.gender && (
+              <View style={styles.smallPill}>
+                <Text style={styles.smallPillText}>{user.gender}</Text>
+              </View>
+            )}
+            {user?.publicId && (
+              <View style={styles.idPill}>
+                <Text style={styles.idLabel}>ID</Text>
+                <Text style={styles.idValue}>#{user.publicId}</Text>
+              </View>
+            )}
+          </View>
+
+          {isCalibrating && (
+            <View style={styles.calibBox}>
+              <View style={styles.calibHeader}>
+                <Clock size={14} color={colors.warningFg} />
+                <Text style={styles.calibText}>
+                  Калибровка: <Text style={{ fontWeight: '700' }}>{matchesPlayed}/{CALIBRATION_TARGET}</Text> матчей сыграно
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${calibProgress * 100}%` }]} />
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
 
       {/* Rating chart */}
       {ratingHistory.length > 1 && (
-        <Card style={{ padding: 16, marginBottom: 16 }}>
-          <Text style={styles.sectionTitle}>График рейтинга</Text>
-          <View style={{ marginTop: 12 }}>
-            <RatingMiniChart points={ratingHistory} />
-          </View>
-        </Card>
+        <SectionCard
+          icon={<TrendingUp size={18} color={colors.primary} />}
+          title="График рейтинга"
+          subtitle="Изменение рейтинга по времени"
+          style={{ marginTop: 14 }}
+        >
+          <RatingMiniChart points={ratingHistory} />
+        </SectionCard>
       )}
 
-      {/* History section */}
-      <SectionToggle
-        icon={<History size={16} color={colors.text} />}
+      {/* Invitations / Friends (parallel sections like web) */}
+      <SectionCard
+        icon={<Gamepad2 size={18} color={colors.primary} />}
+        title="Приглашения в игры"
+        subtitle="0 новых приглашений"
+        style={{ marginTop: 14 }}
+        right={
+          <TouchableOpacity onPress={() => navigation.navigate('Invites')}>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        }
+      >
+        <Text style={styles.empty}>Откройте вкладку «Приглашения» чтобы увидеть.</Text>
+      </SectionCard>
+
+      <SectionCard
+        icon={<Users size={18} color={colors.primary} />}
+        title="Друзья"
+        subtitle="Добавьте друзей по их ID"
+        style={{ marginTop: 14 }}
+        right={
+          <TouchableOpacity
+            onPress={() => setOpenSection(openSection === 'friends' ? null : 'friends')}
+          >
+            <ChevronDown
+              size={18}
+              color={colors.textMuted}
+              style={{ transform: [{ rotate: openSection === 'friends' ? '180deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+        }
+      >
+        <View style={styles.addFriendRow}>
+          <TextInput
+            style={styles.addFriendInput}
+            placeholder="#123456789"
+            placeholderTextColor={colors.textDim}
+            value={friendPublicId}
+            onChangeText={setFriendPublicId}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity onPress={sendFriendRequest} style={styles.addFriendBtn}>
+            <UserPlus size={16} color={colors.primaryFg} />
+          </TouchableOpacity>
+        </View>
+
+        {openSection === 'friends' ? (
+          <>
+            {(friends?.incoming?.length ?? 0) > 0 && (
+              <View style={{ marginTop: 14 }}>
+                <Text style={styles.subTitle}>Входящие заявки</Text>
+                {friends!.incoming.map((r) => (
+                  <View key={r.publicId} style={styles.friendRow}>
+                    <PlayerAvatar name={r.name} avatarUrl={r.avatarUrl} size={32} />
+                    <Text style={[styles.friendName, { flex: 1, marginLeft: 10 }]}>{r.name}</Text>
+                    <Button size="sm" variant="outline" onPress={async () => { await api.acceptFriend(r.publicId); load(); }}>
+                      Принять
+                    </Button>
+                    <TouchableOpacity onPress={async () => { await api.declineFriend(r.publicId); load(); }} style={{ marginLeft: 6, padding: 8 }}>
+                      <Text style={{ color: colors.danger, fontSize: 18 }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {(friends?.friends?.length ?? 0) > 0 ? (
+              <View style={{ marginTop: 12 }}>
+                {friends!.friends.map((f, i) => (
+                  <View
+                    key={f.userId}
+                    style={[styles.friendRow, i !== friends!.friends.length - 1 && styles.rowSep]}
+                  >
+                    <PlayerAvatar name={f.name} avatarUrl={f.avatarUrl} size={32} />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.friendName}>{f.name}</Text>
+                      <Text style={styles.friendMeta}>
+                        {f.gamesPlayed} матчей{f.ntrp ? ` · NTRP ${f.ntrp}` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.friendRating}>{f.rating}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.empty, { marginTop: 12 }]}>Пока нет друзей.</Text>
+            )}
+          </>
+        ) : (
+          <Text style={[styles.empty, { marginTop: 10 }]}>
+            {(friends?.friends?.length ?? 0) > 0
+              ? `${friends!.friends.length} друзей`
+              : 'Пока нет друзей.'}
+          </Text>
+        )}
+      </SectionCard>
+
+      {/* History */}
+      <SectionCard
+        icon={<Calendar size={18} color={colors.primary} />}
         title="История матчей"
-        count={history.length}
-        open={openSection === 'history'}
-        onPress={() => setOpenSection(openSection === 'history' ? null : 'history')}
-      />
-      {openSection === 'history' && (
-        <Card style={{ padding: 4, marginBottom: 16 }}>
-          {history.length === 0 ? (
-            <Text style={styles.empty}>Пока пусто</Text>
-          ) : (
-            history.slice(0, 30).map((h, i) => (
+        subtitle="История ваших игр и изменение рейтинга"
+        style={{ marginTop: 14 }}
+        right={
+          <TouchableOpacity
+            onPress={() => setOpenSection(openSection === 'history' ? null : 'history')}
+          >
+            <ChevronDown
+              size={18}
+              color={colors.textMuted}
+              style={{ transform: [{ rotate: openSection === 'history' ? '180deg' : '0deg' }] }}
+            />
+          </TouchableOpacity>
+        }
+      >
+        {history.length === 0 ? (
+          <Text style={styles.empty}>Пока пусто</Text>
+        ) : openSection === 'history' ? (
+          <View style={{ gap: 8 }}>
+            {history.slice(0, 30).map((h) => (
               <TouchableOpacity
                 key={h.eventId}
-                style={[styles.historyRow, i !== Math.min(history.length, 30) - 1 && styles.rowSep]}
+                style={styles.historyRow}
                 onPress={() => navigation.navigate('HistoryEvent', { eventId: h.eventId, eventTitle: h.eventTitle })}
               >
                 <View style={{ flex: 1 }}>
@@ -173,97 +364,24 @@ export default function ProfileScreen() {
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.deltaText,
-                      { color: h.ratingDelta >= 0 ? colors.success : colors.danger },
-                    ]}
-                  >
+                  <Text style={[styles.deltaText, { color: h.ratingDelta >= 0 ? colors.success : colors.danger }]}>
                     {h.ratingDelta >= 0 ? '+' : ''}{h.ratingDelta}
                   </Text>
                 </View>
-                <ChevronRight size={14} color={colors.textDim} />
               </TouchableOpacity>
-            ))
-          )}
-        </Card>
-      )}
-
-      {/* Friends section */}
-      <SectionToggle
-        icon={<Users size={16} color={colors.text} />}
-        title="Друзья"
-        count={friends?.friends.length ?? 0}
-        open={openSection === 'friends'}
-        onPress={() => setOpenSection(openSection === 'friends' ? null : 'friends')}
-      />
-      {openSection === 'friends' && (
-        <Card style={{ padding: 12, marginBottom: 16 }}>
-          <View style={styles.addFriendRow}>
-            <TextInput
-              style={styles.addFriendInput}
-              placeholder="Public ID игрока"
-              placeholderTextColor={colors.textDim}
-              value={friendPublicId}
-              onChangeText={setFriendPublicId}
-              autoCapitalize="none"
-            />
-            <Button size="sm" onPress={sendFriendRequest} leftIcon={<UserPlus size={14} color={colors.primaryFg} />}>
-              Заявка
-            </Button>
+            ))}
           </View>
-
-          {(friends?.incoming?.length ?? 0) > 0 && (
-            <View style={{ marginTop: 14 }}>
-              <Text style={styles.subTitle}>Входящие заявки</Text>
-              {friends!.incoming.map((r) => (
-                <View key={r.publicId} style={styles.friendRow}>
-                  <PlayerAvatar name={r.name} avatarUrl={r.avatarUrl} size={32} />
-                  <Text style={[styles.friendName, { flex: 1, marginLeft: 10 }]}>{r.name}</Text>
-                  <Button size="sm" variant="outline" onPress={async () => { await api.acceptFriend(r.publicId); load(); }}>
-                    Принять
-                  </Button>
-                  <TouchableOpacity onPress={async () => { await api.declineFriend(r.publicId); load(); }} style={{ marginLeft: 8, padding: 8 }}>
-                    <Text style={{ color: colors.danger, fontSize: 18 }}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {(friends?.friends?.length ?? 0) > 0 ? (
-            <View style={{ marginTop: 12 }}>
-              {friends!.friends.map((f, i) => (
-                <View
-                  key={f.userId}
-                  style={[
-                    styles.friendRow,
-                    i !== friends!.friends.length - 1 && styles.rowSep,
-                  ]}
-                >
-                  <PlayerAvatar name={f.name} avatarUrl={f.avatarUrl} size={32} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.friendName}>{f.name}</Text>
-                    <Text style={styles.friendMeta}>
-                      {f.gamesPlayed} матчей{f.ntrp ? ` · NTRP ${f.ntrp}` : ''}
-                    </Text>
-                  </View>
-                  <Text style={styles.friendRating}>{f.rating}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={[styles.empty, { marginTop: 12 }]}>Пока нет друзей</Text>
-          )}
-        </Card>
-      )}
+        ) : (
+          <Text style={styles.empty}>{history.length} игр в истории</Text>
+        )}
+      </SectionCard>
 
       <Button
         variant="outline"
         fullWidth
         onPress={logout}
         leftIcon={<LogOut size={14} color={colors.danger} />}
-        style={{ borderColor: colors.destructiveTintBorder, marginTop: 8 }}
+        style={{ borderColor: 'rgba(239,68,68,0.4)', marginTop: 14 }}
       >
         <Text style={{ color: colors.danger, fontWeight: '600' }}>Выйти</Text>
       </Button>
@@ -271,112 +389,133 @@ export default function ProfileScreen() {
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <View style={styles.statBox}>
-      <Text style={[styles.statValue, accent && { color: colors.primary }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function SectionToggle({
-  icon, title, count, open, onPress,
-}: { icon: React.ReactNode; title: string; count: number; open: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={styles.sectionToggle} onPress={onPress}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {icon}
-        <Text style={styles.sectionToggleText}>{title}</Text>
-        <View style={styles.sectionCount}>
-          <Text style={styles.sectionCountText}>{count}</Text>
-        </View>
-      </View>
-      <ChevronDown
-        size={16}
-        color={colors.textMuted}
-        style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
-      />
-    </TouchableOpacity>
-  );
-}
+const COVER_HEIGHT = 90;
+const AVATAR_SIZE = 80;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
-  name: { color: colors.text, fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 6 },
-  email: { color: colors.textMuted, fontSize: 13, marginTop: 2, textAlign: 'center' },
+  // Profile card
+  profileCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  cover: {
+    height: COVER_HEIGHT,
+    backgroundColor: 'rgba(34,197,94,0.15)',
+    position: 'relative',
+  },
+  coverGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(34,197,94,0.10)',
+  },
+  profileBody: { padding: 16, paddingTop: 0 },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  avatarWrap: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: 18,
+    backgroundColor: colors.secondary,
+    borderWidth: 3,
+    borderColor: colors.bgCard,
+    marginTop: -AVATAR_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarInitial: { color: colors.primary, fontSize: 32, fontWeight: '700' },
+  avatarBusy: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: { color: colors.text, fontSize: 22, fontWeight: '700' },
+  emailRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  email: { color: colors.textMuted, fontSize: 13 },
 
-  publicIdRow: {
+  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  smallPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.secondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    minWidth: 36,
+  },
+  smallPillText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  idPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 8,
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-  },
-  publicIdLabel: { color: colors.textMuted, fontSize: 11 },
-  publicIdValue: { color: colors.text, fontSize: 12, fontWeight: '600' },
-
-  statsRow: { flexDirection: 'row', gap: 10, marginTop: 18, alignSelf: 'stretch' },
-  statBox: {
-    flex: 1,
-    backgroundColor: 'rgba(54,54,54,0.4)',
-    borderRadius: radii.md,
-    padding: 10,
-    alignItems: 'center',
-  },
-  statValue: { color: colors.text, fontSize: 20, fontWeight: '700' },
-  statLabel: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-
-  calibBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 14,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: colors.amberTint,
-    borderColor: colors.amberTintBorder,
-    borderWidth: 1,
-    borderRadius: radii.md,
-  },
-  calibText: { color: colors.warningFg, fontSize: 12 },
-
-  sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
-
-  sectionToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.bgCard,
-    borderRadius: radii.lg,
+    paddingVertical: 6,
+    borderRadius: radii.full,
+    backgroundColor: colors.secondary,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
   },
-  sectionToggleText: { color: colors.text, fontSize: 14, fontWeight: '600' },
-  sectionCount: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-    borderRadius: radii.full,
-  },
-  sectionCountText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  idLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  idValue: { color: colors.text, fontSize: 12, fontWeight: '700' },
 
-  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', padding: 16 },
+  calibBox: {
+    marginTop: 14,
+    padding: 12,
+    backgroundColor: 'rgba(245,158,11,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+    borderRadius: radii.lg,
+  },
+  calibHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  calibText: { color: colors.warningFg, fontSize: 13 },
+  progressTrack: {
+    height: 6,
+    backgroundColor: 'rgba(245,158,11,0.20)',
+    borderRadius: radii.full,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: colors.warning, borderRadius: radii.full },
+
+  // Sections
+  empty: { color: colors.textMuted, fontSize: 13 },
+  subTitle: { color: colors.textMuted, fontSize: 12, marginBottom: 6, fontWeight: '500' },
   rowSep: { borderBottomWidth: 1, borderBottomColor: colors.border },
 
+  // Add friend
+  addFriendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addFriendInput: {
+    flex: 1,
+    backgroundColor: 'rgba(54,54,54,0.4)',
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 14,
+  },
+  addFriendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // History
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     gap: 10,
   },
   historyTitle: { color: colors.text, fontSize: 14, fontWeight: '500' },
@@ -389,24 +528,8 @@ const styles = StyleSheet.create({
   },
   deltaText: { fontSize: 13, fontWeight: '700' },
 
-  addFriendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  addFriendInput: {
-    flex: 1,
-    backgroundColor: 'rgba(54,54,54,0.3)',
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 14,
-  },
-  subTitle: { color: colors.textMuted, fontSize: 12, marginBottom: 6, fontWeight: '500' },
-  friendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
+  // Friends
+  friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   friendName: { color: colors.text, fontSize: 14, fontWeight: '500' },
   friendMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   friendRating: { color: colors.primary, fontSize: 14, fontWeight: '700' },

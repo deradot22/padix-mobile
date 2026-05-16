@@ -1,9 +1,13 @@
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { Home, Trophy, Mail, User, Gamepad2 } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/colors';
+import { api } from '../api/client';
 import LoginScreen from '../screens/LoginScreen';
 import GamesScreen from '../screens/GamesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -15,10 +19,8 @@ import HistoryEventScreen from '../screens/HistoryEventScreen';
 import InvitesScreen from '../screens/InvitesScreen';
 import SurveyScreen from '../screens/SurveyScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import HomeScreen from '../screens/HomeScreen';
 import RatingNotificationModal from '../components/RatingNotificationModal';
-import { useEffect, useState } from 'react';
-import { AppState } from 'react-native';
-import { api } from '../api/client';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -29,26 +31,19 @@ const navTheme = {
   colors: {
     ...DefaultTheme.colors,
     background: colors.bg,
-    card: colors.bgElevated,
+    card: colors.bgCard,
     text: colors.text,
     border: colors.border,
     primary: colors.primary,
   },
 };
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  return (
-    <Text style={{ fontSize: 11, color: focused ? colors.primary : colors.textDim }}>
-      {label}
-    </Text>
-  );
-}
-
 function useInviteCount() {
   const [count, setCount] = useState(0);
   useEffect(() => {
     let mounted = true;
-    const tick = () => api.invites().then((d) => { if (mounted) setCount(d.length); }).catch(() => {});
+    const tick = () =>
+      api.invites().then((d) => { if (mounted) setCount(d.length); }).catch(() => {});
     tick();
     const id = setInterval(tick, 60000);
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active') tick(); });
@@ -62,23 +57,33 @@ function MainTabs() {
   return (
     <Tabs.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: colors.bgElevated },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: '600' },
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.bgElevated,
+          backgroundColor: colors.bgCard,
           borderTopColor: colors.border,
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textDim,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
       }}
     >
+      <Tabs.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: 'Главная',
+          tabBarIcon: ({ color, size }) => <Home size={size - 2} color={color} />,
+        }}
+      />
       <Tabs.Screen
         name="Games"
         component={GamesScreen}
         options={{
           title: 'Игры',
-          tabBarIcon: ({ focused }) => <TabIcon label="🎾" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Gamepad2 size={size - 2} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -86,7 +91,7 @@ function MainTabs() {
         component={RatingScreen}
         options={{
           title: 'Рейтинг',
-          tabBarIcon: ({ focused }) => <TabIcon label="🏆" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Trophy size={size - 2} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -94,7 +99,7 @@ function MainTabs() {
         component={InvitesScreen}
         options={{
           title: 'Приглашения',
-          tabBarIcon: ({ focused }) => <TabIcon label="📨" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Mail size={size - 2} color={color} />,
           tabBarBadge: inviteCount > 0 ? inviteCount : undefined,
         }}
       />
@@ -103,7 +108,7 @@ function MainTabs() {
         component={ProfileScreen}
         options={{
           title: 'Профиль',
-          tabBarIcon: ({ focused }) => <TabIcon label="👤" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <User size={size - 2} color={color} />,
         }}
       />
     </Tabs.Navigator>
@@ -125,9 +130,10 @@ export default function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: { backgroundColor: colors.bgElevated },
+          headerStyle: { backgroundColor: colors.bgCard },
           headerTintColor: colors.text,
           headerTitleStyle: { fontWeight: '600' },
+          headerShadowVisible: false,
         }}
       >
         {user && !user.surveyCompleted ? (

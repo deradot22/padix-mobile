@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,14 +9,17 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Calendar, Clock, List, Plus, Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import {
+  Calendar, ChevronLeft, ChevronRight, Gamepad2, List, Plus, Users,
+} from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { Event } from '../api/types';
 import { colors, radii } from '../theme/colors';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { SectionCard } from '../components/ui/SectionCard';
+import { PillBadge } from '../components/ui/PillBadge';
 
 function formatDate(d: Date): string {
   const yyyy = d.getFullYear();
@@ -38,12 +40,13 @@ function timeRange(start: string, end: string): string {
   return `${start?.slice(0, 5)}–${end?.slice(0, 5)}`;
 }
 
-function getStatusBadge(status: Event['status']) {
-  if (status === 'OPEN_FOR_REGISTRATION') return <Badge variant="primary">Регистрация</Badge>;
-  if (status === 'IN_PROGRESS') return <Badge variant="amber">В процессе</Badge>;
-  if (status === 'FINISHED') return <Badge>Завершено</Badge>;
-  if (status === 'REGISTRATION_CLOSED') return <Badge variant="amber">Закрыта</Badge>;
-  return <Badge>{status}</Badge>;
+function statusBadge(status: Event['status']) {
+  if (status === 'OPEN_FOR_REGISTRATION') return <PillBadge tone="primary" filled>Регистрация</PillBadge>;
+  if (status === 'IN_PROGRESS') return <PillBadge tone="amber" filled>В процессе</PillBadge>;
+  if (status === 'FINISHED') return <PillBadge tone="neutral" filled>Завершено</PillBadge>;
+  if (status === 'REGISTRATION_CLOSED') return <PillBadge tone="amber" filled>Закрыта</PillBadge>;
+  if (status === 'DRAFT') return <PillBadge tone="neutral" filled>Черновик</PillBadge>;
+  return <PillBadge tone="neutral" filled>{status}</PillBadge>;
 }
 
 type ViewMode = 'list' | 'calendar';
@@ -68,7 +71,6 @@ export default function GamesScreen() {
       const upcoming = data.filter((e) => e.status !== 'FINISHED');
       setEvents(upcoming);
 
-      // Fetch which we're registered for
       if (user?.playerId && upcoming.length > 0) {
         try {
           const details = await Promise.all(upcoming.map((e) => api.eventDetails(e.id)));
@@ -96,55 +98,58 @@ export default function GamesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load(); }}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        <PageHeader
-          title="Игры"
-          subtitle="Выберите игру для участия"
-          right={
-            <Button
-              size="sm"
-              onPress={() => navigation.navigate('CreateEvent')}
-              leftIcon={<Plus size={16} color={colors.primaryFg} />}
-            >
-              Создать
-            </Button>
-          }
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => { setRefreshing(true); load(); }}
+          tintColor={colors.primary}
         />
+      }
+    >
+      <PageHeader
+        title="Игры"
+        subtitle="Выберите игру для участия"
+        right={
+          <Button
+            size="sm"
+            onPress={() => navigation.navigate('CreateEvent')}
+            leftIcon={<Plus size={14} color={colors.primaryFg} />}
+          >
+            Создать игру
+          </Button>
+        }
+      />
 
-        <View style={styles.toggle}>
-          <ToggleBtn
-            active={view === 'list'}
-            label="Игры"
-            icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
-            onPress={() => setView('list')}
-          />
-          <ToggleBtn
-            active={view === 'calendar'}
-            label="Календарь"
-            icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
-            onPress={() => setView('calendar')}
-          />
-        </View>
+      <View style={styles.toggle}>
+        <ToggleBtn
+          active={view === 'list'}
+          label="Игры"
+          icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
+          onPress={() => setView('list')}
+        />
+        <ToggleBtn
+          active={view === 'calendar'}
+          label="Календарь"
+          icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
+          onPress={() => setView('calendar')}
+        />
+      </View>
 
-        {view === 'list' ? (
-          events.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>{error ?? 'Ближайших игр нет'}</Text>
-            </View>
+      {view === 'list' ? (
+        <SectionCard
+          icon={<Calendar size={18} color={colors.primary} />}
+          title="Ближайшие игры (2 недели)"
+          subtitle={`${events.length} ${events.length === 1 ? 'игра' : 'игр'}`}
+        >
+          {events.length === 0 ? (
+            <Text style={styles.empty}>{error ?? 'Ближайших игр нет'}</Text>
           ) : (
             <View style={{ gap: 8 }}>
               {events.map((e) => (
-                <EventListRow
+                <EventRow
                   key={e.id}
                   event={e}
                   registered={registeredIds[e.id]}
@@ -152,15 +157,15 @@ export default function GamesScreen() {
                 />
               ))}
             </View>
-          )
-        ) : (
-          <CalendarView
-            events={events}
-            onEventPress={(id) => navigation.navigate('EventDetails', { eventId: id })}
-          />
-        )}
-      </ScrollView>
-    </View>
+          )}
+        </SectionCard>
+      ) : (
+        <CalendarView
+          events={events}
+          onEventPress={(id) => navigation.navigate('EventDetails', { eventId: id })}
+        />
+      )}
+    </ScrollView>
   );
 }
 
@@ -175,32 +180,30 @@ function ToggleBtn({
   );
 }
 
-function EventListRow({
+function EventRow({
   event, registered, onPress,
 }: { event: Event; registered?: boolean; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.eventRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        {event.title && (
-          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
-        )}
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+        <Text style={styles.eventTitle} numberOfLines={1}>{event.title || 'Игра'}</Text>
         <View style={styles.metaRow}>
-          <Calendar size={14} color={colors.textMuted} />
           <Text style={styles.metaText}>{shortDate(event.date)}</Text>
+          <Text style={styles.metaDot}>·</Text>
           <Text style={styles.metaText}>{timeRange(event.startTime, event.endTime)}</Text>
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>
             {event.pairingMode === 'BALANCED' ? 'Баланс' : 'Каждый с каждым'}
           </Text>
-          <Text style={styles.dot}>·</Text>
-          <Users size={14} color={colors.textMuted} />
+          <Text style={styles.metaDot}>·</Text>
+          <Users size={12} color={colors.textMuted} />
           <Text style={styles.metaText}>{event.registeredCount}/{event.courtsCount * 4}</Text>
         </View>
       </View>
-      <View style={{ alignItems: 'flex-end', gap: 6 }}>
-        {registered && <Badge variant="primary">Вы записаны</Badge>}
-        {getStatusBadge(event.status)}
+      <View style={styles.eventRight}>
+        {registered && <PillBadge tone="primary" filled>Вы записаны</PillBadge>}
+        {statusBadge(event.status)}
       </View>
     </TouchableOpacity>
   );
@@ -237,20 +240,24 @@ function CalendarView({
   const selectedEvents = selectedDate ? eventsByDate[selectedDate] ?? [] : [];
 
   return (
-    <View style={styles.calendarCard}>
+    <SectionCard
+      icon={<Calendar size={18} color={colors.primary} />}
+      title="Календарь"
+      subtitle={monthName}
+    >
       <View style={styles.monthNav}>
         <TouchableOpacity
           onPress={() => setMonth(month.m === 0 ? { y: month.y - 1, m: 11 } : { ...month, m: month.m - 1 })}
           style={styles.navArrow}
         >
-          <ChevronLeft size={20} color={colors.text} />
+          <ChevronLeft size={18} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.monthLabel}>{monthName}</Text>
         <TouchableOpacity
           onPress={() => setMonth(month.m === 11 ? { y: month.y + 1, m: 0 } : { ...month, m: month.m + 1 })}
           style={styles.navArrow}
         >
-          <ChevronRight size={20} color={colors.text} />
+          <ChevronRight size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -284,7 +291,7 @@ function CalendarView({
               ]}>{d}</Text>
               {has && (
                 <View style={[
-                  styles.dot2,
+                  styles.dot,
                   { backgroundColor: isSelected ? colors.primaryFg : colors.primary },
                 ]} />
               )}
@@ -294,17 +301,17 @@ function CalendarView({
       </View>
 
       {selectedDate && (
-        <View style={styles.selectedList}>
+        <View style={{ marginTop: 12, gap: 8 }}>
           {selectedEvents.length === 0 ? (
-            <Text style={styles.emptyText}>В этот день игр нет</Text>
+            <Text style={styles.empty}>В этот день игр нет</Text>
           ) : (
             selectedEvents.map((e) => (
-              <EventListRow key={e.id} event={e} onPress={() => onEventPress(e.id)} />
+              <EventRow key={e.id} event={e} onPress={() => onEventPress(e.id)} />
             ))
           )}
         </View>
       )}
-    </View>
+    </SectionCard>
   );
 }
 
@@ -319,14 +326,14 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
-    alignSelf: 'flex-end',
     marginBottom: 16,
   },
   toggleBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radii.md,
   },
@@ -334,40 +341,32 @@ const styles = StyleSheet.create({
   toggleText: { color: colors.textMuted, fontSize: 13, fontWeight: '500' },
   toggleTextActive: { color: colors.primaryFg, fontWeight: '600' },
 
-  empty: { padding: 40, alignItems: 'center' },
-  emptyText: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
+  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', padding: 12 },
 
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bgCard,
-    borderRadius: radii.lg,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-  },
-  eventTitle: { color: colors.text, fontSize: 14, fontWeight: '500' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  metaText: { color: colors.textMuted, fontSize: 12 },
-  dot: { color: colors.textMuted, fontSize: 12 },
-
-  calendarCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: 'rgba(54,54,54,0.30)',
+    borderRadius: radii.md,
     padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 10,
   },
+  eventTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  metaText: { color: colors.textMuted, fontSize: 11 },
+  metaDot: { color: colors.textDim, fontSize: 11 },
+  eventRight: { alignItems: 'flex-end', gap: 4 },
+
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  navArrow: { padding: 6, borderRadius: radii.md },
-  monthLabel: { color: colors.text, fontSize: 15, fontWeight: '600', textTransform: 'capitalize' },
+  navArrow: { padding: 6, borderRadius: radii.md, backgroundColor: 'rgba(54,54,54,0.3)' },
+  monthLabel: { color: colors.text, fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
   weekdays: { flexDirection: 'row', marginBottom: 4 },
   weekday: { flex: 1, textAlign: 'center', color: colors.textMuted, fontSize: 11, fontWeight: '500' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -381,6 +380,5 @@ const styles = StyleSheet.create({
   cellToday: { backgroundColor: 'rgba(34,197,94,0.10)' },
   cellSelected: { backgroundColor: colors.primary },
   dayNum: { color: colors.text, fontSize: 13 },
-  dot2: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 4 },
-  selectedList: { marginTop: 12, gap: 8 },
+  dot: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 4 },
 });
