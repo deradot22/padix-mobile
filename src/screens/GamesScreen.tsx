@@ -123,21 +123,19 @@ export default function GamesScreen() {
         }
       />
 
-      <View style={styles.toggleWrap}>
-        <View style={styles.toggle}>
-          <ToggleBtn
-            active={view === 'list'}
-            label="Игры"
-            icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
-            onPress={() => setView('list')}
-          />
-          <ToggleBtn
-            active={view === 'calendar'}
-            label="Календарь"
-            icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
-            onPress={() => setView('calendar')}
-          />
-        </View>
+      <View style={styles.toggle}>
+        <ToggleBtn
+          active={view === 'list'}
+          label="Игры"
+          icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
+          onPress={() => setView('list')}
+        />
+        <ToggleBtn
+          active={view === 'calendar'}
+          label="Календарь"
+          icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
+          onPress={() => setView('calendar')}
+        />
       </View>
 
       {view === 'list' ? (
@@ -325,7 +323,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
-  toggleWrap: { alignItems: 'flex-end', marginBottom: 16 },
   toggle: {
     flexDirection: 'row',
     backgroundColor: 'rgba(54,54,54,0.3)',
@@ -333,13 +330,14 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: 16,
   },
   toggleBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radii.md,
   },

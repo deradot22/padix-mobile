@@ -97,12 +97,14 @@ export default function HomeScreen() {
         </Text>
         <View style={styles.heroButtons}>
           <Button
+            fullWidth
             onPress={() => navigation.navigate('Games')}
             leftIcon={<Gamepad2 size={16} color={colors.primaryFg} />}
           >
             Найти игру
           </Button>
           <Button
+            fullWidth
             variant="outline"
             onPress={() => navigation.navigate('CreateEvent')}
             rightIcon={<ChevronRight size={16} color={colors.text} />}
@@ -212,9 +214,11 @@ function StatCard({
   return (
     <View style={styles.statCard}>
       <View style={styles.statIconBox}>{icon}</View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {sub && <Text style={styles.statSub}>{sub}</Text>}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+        {sub && <Text style={styles.statSub}>{sub}</Text>}
+      </View>
     </View>
   );
 }
@@ -239,7 +243,7 @@ const styles = StyleSheet.create({
     lineHeight: 36,
   },
   heroSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 10, lineHeight: 20 },
-  heroButtons: { flexDirection: 'row', gap: 8, marginTop: 18, flexWrap: 'wrap' },
+  heroButtons: { gap: 8, marginTop: 18 },
 
   statsGrid: { gap: 10 },
   statCard: {
@@ -260,9 +264,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statValue: { color: colors.text, fontSize: 28, fontWeight: '700' },
-  statLabel: { color: colors.textMuted, fontSize: 13, flex: 1 },
-  statSub: { color: colors.textDim, fontSize: 11, marginTop: 2 },
+  statValue: { color: colors.text, fontSize: 28, fontWeight: '700', lineHeight: 32 },
+  statLabel: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  statSub: { color: colors.textDim, fontSize: 11, marginTop: 4 },
 
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   link: { color: colors.primary, fontSize: 13, fontWeight: '500' },

@@ -79,7 +79,7 @@ export default function CreateEventScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+        <View style={{ marginBottom: 8 }}>
           <PillBadge icon={<Sparkles size={12} color={colors.primary} />} tone="primary" filled>
             Создание новой игры
           </PillBadge>
@@ -239,25 +239,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   title: {
     color: colors.text,
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginTop: 12,
-    textAlign: 'center',
+    lineHeight: 32,
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 20,
     marginTop: 8,
-    marginBottom: 16,
-    textAlign: 'center',
+    marginBottom: 18,
   },
   progressTrack: {
     flexDirection: 'row',
     gap: 6,
     marginBottom: 22,
-    paddingHorizontal: 40,
   },
   progressDot: {
     flex: 1,
