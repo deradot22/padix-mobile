@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,8 +15,8 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Player } from '../api/types';
 import { colors, radii } from '../theme/colors';
 import { PageHeader } from '../components/ui/PageHeader';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
+import { SectionCard } from '../components/ui/SectionCard';
+import { PillBadge } from '../components/ui/PillBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 
 function ntrpLevel(rating: number): string {
@@ -85,7 +84,7 @@ export default function RatingScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+      contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -94,16 +93,24 @@ export default function RatingScreen() {
         />
       }
     >
-      <PageHeader title="Рейтинг" subtitle="Топ игроков сообщества" />
+      <PageHeader
+        title="Рейтинг"
+        subtitle="Таблица лидеров падел-игроков"
+        right={
+          <View style={styles.metaPills}>
+            <PillBadge tone="primary" filled>
+              <Users size={11} color={colors.primary} /> {stats.calibrated}
+            </PillBadge>
+            <PillBadge tone="amber" filled>
+              {stats.inCalib}
+            </PillBadge>
+          </View>
+        }
+      />
 
-      <View style={styles.statsRow}>
-        <StatCard icon={<Users size={16} color={colors.primary} />} label="Всего" value={stats.total} />
-        <StatCard icon={<Trophy size={16} color={colors.warningFg} />} label="Откалибровано" value={stats.calibrated} />
-        <StatCard icon={<TrendingUp size={16} color={colors.textMuted} />} label="Калибровка" value={stats.inCalib} />
-      </View>
-
+      {/* My rank card */}
       {myRank != null && (
-        <Card style={{ marginBottom: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={styles.myRankCard}>
           <View style={[styles.rankBadge, getRankStyle(myRank)]}>
             <Text style={[styles.rankText, { color: getRankTextColor(myRank) }]}>{myRank}</Text>
           </View>
@@ -112,14 +119,15 @@ export default function RatingScreen() {
             <Text style={styles.myRankName}>{user?.name}</Text>
           </View>
           <Text style={styles.myRating}>{user?.rating}</Text>
-        </Card>
+        </View>
       )}
 
+      {/* Search */}
       <View style={styles.searchBox}>
-        <Search size={16} color={colors.textMuted} style={styles.searchIcon} />
+        <Search size={16} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Поиск игрока"
+          placeholder="Поиск по имени..."
           placeholderTextColor={colors.textDim}
           value={search}
           onChangeText={setSearch}
@@ -127,65 +135,55 @@ export default function RatingScreen() {
         />
       </View>
 
-      <Card style={{ padding: 0 }}>
+      <SectionCard
+        icon={<Trophy size={18} color={colors.primary} />}
+        title="Лидеры"
+        subtitle={`${filtered.length} игроков`}
+      >
         {filtered.length === 0 ? (
           <Text style={styles.empty}>Никого не нашли</Text>
         ) : (
-          filtered.map((p, idx) => {
-            const realRank = players.findIndex((x) => x.id === p.id) + 1;
-            const isMe = p.id === user?.playerId;
-            const isCalib = (p.calibrationEventsRemaining ?? 0) > 0;
-            const ntrp = p.ntrp ?? ntrpLevel(p.rating);
-            const ntrpColor = NTRP_COLOR[ntrp] ?? colors.textMuted;
-            return (
-              <View
-                key={p.id}
-                style={[
-                  styles.row,
-                  isMe && styles.rowMe,
-                  idx !== filtered.length - 1 && styles.rowSep,
-                ]}
-              >
-                <View style={[styles.rankBadge, getRankStyle(realRank)]}>
-                  {realRank === 1 ? (
-                    <Trophy size={12} color={getRankTextColor(1)} />
-                  ) : (
-                    <Text style={[styles.rankText, { color: getRankTextColor(realRank) }]}>{realRank}</Text>
-                  )}
-                </View>
-
-                <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={32} />
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={[styles.name, isMe && { color: colors.primary }]} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    {isMe && <Badge variant="primary">Вы</Badge>}
-                    {isCalib && <Badge variant="amber">Калибровка</Badge>}
+          <View style={{ gap: 6 }}>
+            {filtered.map((p) => {
+              const realRank = players.findIndex((x) => x.id === p.id) + 1;
+              const isMe = p.id === user?.playerId;
+              const isCalib = (p.calibrationEventsRemaining ?? 0) > 0;
+              const ntrp = p.ntrp ?? ntrpLevel(p.rating);
+              const ntrpColor = NTRP_COLOR[ntrp] ?? colors.textMuted;
+              return (
+                <View
+                  key={p.id}
+                  style={[styles.row, isMe && styles.rowMe]}
+                >
+                  <View style={[styles.rankBadge, getRankStyle(realRank)]}>
+                    {realRank === 1
+                      ? <Trophy size={12} color={getRankTextColor(1)} />
+                      : <Text style={[styles.rankText, { color: getRankTextColor(realRank) }]}>{realRank}</Text>}
                   </View>
-                  <Text style={styles.sub}>
-                    {p.gamesPlayed} матчей · <Text style={{ color: ntrpColor }}>{ntrp}</Text>
-                  </Text>
+
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={32} />
+
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[styles.name, isMe && { color: colors.primary }]} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      {isMe && <PillBadge tone="primary" filled>Вы</PillBadge>}
+                    </View>
+                    <Text style={styles.sub}>
+                      {p.gamesPlayed} матчей · <Text style={{ color: ntrpColor }}>{ntrp}</Text>
+                      {isCalib && ' · калибровка'}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.rating}>{p.rating}</Text>
                 </View>
-
-                <Text style={styles.rating}>{p.rating}</Text>
-              </View>
-            );
-          })
+              );
+            })}
+          </View>
         )}
-      </Card>
+      </SectionCard>
     </ScrollView>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <View style={styles.statCard}>
-      <View style={styles.statIcon}>{icon}</View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -207,54 +205,52 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.bgCard,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-    alignItems: 'center',
-  },
-  statIcon: { marginBottom: 6 },
-  statValue: { color: colors.text, fontSize: 20, fontWeight: '700' },
-  statLabel: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  metaPills: { flexDirection: 'row', gap: 6 },
 
+  myRankCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
   myRankLabel: { color: colors.textMuted, fontSize: 11 },
   myRankName: { color: colors.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
-  myRating: { color: colors.primary, fontSize: 20, fontWeight: '700' },
+  myRating: { color: colors.primary, fontSize: 22, fontWeight: '700' },
 
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     backgroundColor: colors.bgCard,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingLeft: 12,
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    marginBottom: 14,
   },
-  searchIcon: { marginRight: 8 },
   searchInput: {
     flex: 1,
     color: colors.text,
     fontSize: 14,
-    paddingHorizontal: 0,
     paddingVertical: 10,
   },
 
-  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', padding: 32 },
+  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', padding: 16 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
+    borderRadius: radii.md,
   },
   rowMe: { backgroundColor: 'rgba(34,197,94,0.08)' },
-  rowSep: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rankBadge: {
     width: 28,
     height: 28,
@@ -265,6 +261,6 @@ const styles = StyleSheet.create({
   },
   rankText: { fontSize: 12, fontWeight: '700' },
   name: { color: colors.text, fontSize: 14, fontWeight: '500' },
-  sub: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  sub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   rating: { color: colors.text, fontSize: 16, fontWeight: '700' },
 });

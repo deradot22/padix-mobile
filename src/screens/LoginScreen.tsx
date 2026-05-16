@@ -8,12 +8,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Sparkles } from 'lucide-react-native';
 import { api, setToken } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, radii } from '../theme/colors';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { PillBadge } from '../components/ui/PillBadge';
 
 type Mode = 'login' | 'register';
 
@@ -62,19 +63,19 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoWrap}>
-          <Text style={styles.logo}>Padix</Text>
-          <Text style={styles.tagline}>Падел-теннис · Американка</Text>
+        <View style={styles.hero}>
+          <PillBadge icon={<Sparkles size={12} color={colors.primary} />} tone="primary" filled>
+            Сезон 2026
+          </PillBadge>
+          <Text style={styles.heroTitle}>
+            Добро пожаловать в <Text style={{ color: colors.primary }}>padix</Text>
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Организуйте игры в падел, отслеживайте свой рейтинг и находите партнёров для игры.
+          </Text>
         </View>
 
-        <Card style={{ padding: 24 }}>
-          <Text style={styles.title}>
-            {mode === 'login' ? 'Вход в аккаунт' : 'Создание аккаунта'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {mode === 'login' ? 'Введите email и пароль' : 'Несколько шагов до игры'}
-          </Text>
-
+        <View style={styles.formCard}>
           <View style={styles.modeSwitch}>
             <ModeBtn label="Вход" active={mode === 'login'} onPress={() => setMode('login')} />
             <ModeBtn label="Регистрация" active={mode === 'register'} onPress={() => setMode('register')} />
@@ -107,17 +108,17 @@ export default function LoginScreen() {
               <View style={styles.genderRow}>
                 <GenderBtn label="М" active={gender === 'M'} onPress={() => setGender('M')} />
                 <GenderBtn label="Ж" active={gender === 'F'} onPress={() => setGender('F')} />
-                <GenderBtn label="Не указано" active={gender === null} onPress={() => setGender(null)} />
+                <GenderBtn label="—" active={gender === null} onPress={() => setGender(null)} />
               </View>
             </View>
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <Button onPress={handleSubmit} loading={loading} fullWidth size="lg" style={{ marginTop: 8 }}>
+          <Button onPress={handleSubmit} loading={loading} fullWidth size="lg" style={{ marginTop: 4 }}>
             {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
           </Button>
-        </Card>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -141,33 +142,47 @@ function GenderBtn({ label, active, onPress }: { label: string; active: boolean;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
 
-  logoWrap: { alignItems: 'center', marginBottom: 24 },
-  logo: { color: colors.primary, fontSize: 42, fontWeight: '800', letterSpacing: -1 },
-  tagline: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+  hero: { marginBottom: 16, alignItems: 'flex-start' },
+  heroTitle: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: 14,
+    lineHeight: 36,
+  },
+  heroSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 10, lineHeight: 20 },
 
-  title: { color: colors.text, fontSize: 20, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 18 },
+  formCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.xl,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 
   modeSwitch: {
     flexDirection: 'row',
-    backgroundColor: colors.secondary,
+    backgroundColor: 'rgba(54,54,54,0.30)',
     borderRadius: radii.md,
     padding: 3,
-    marginBottom: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radii.sm },
-  modeBtnActive: { backgroundColor: colors.bgCard },
+  modeBtnActive: { backgroundColor: colors.primary },
   modeBtnText: { color: colors.textMuted, fontSize: 13 },
-  modeBtnTextActive: { color: colors.text, fontWeight: '600' },
+  modeBtnTextActive: { color: colors.primaryFg, fontWeight: '600' },
 
   fieldWrap: { marginBottom: 14 },
   label: { color: colors.textMuted, fontSize: 13, marginBottom: 6 },
   genderRow: { flexDirection: 'row', gap: 8 },
   genderBtn: {
     flex: 1,
-    backgroundColor: 'rgba(54,54,54,0.3)',
+    backgroundColor: 'rgba(54,54,54,0.30)',
     borderRadius: radii.md,
     paddingVertical: 10,
     alignItems: 'center',

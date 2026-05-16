@@ -11,16 +11,16 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import {
-  Calendar, Clock, Users, Trophy, Trash2, Pencil, UserPlus,
-  Play, Square, Flag, Plus, Check, X, ChevronRight, Crown,
+  Calendar, ChevronRight, Clock, Crown, Flag, Pencil, Play, Plus,
+  Square, Trash2, Trophy, UserPlus, Users, X,
 } from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventDetails, EventInviteStatusItem, Match, Round } from '../api/types';
 import { colors, radii } from '../theme/colors';
-import { Card } from '../components/ui/Card';
+import { SectionCard } from '../components/ui/SectionCard';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { PillBadge } from '../components/ui/PillBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScoreInputModal from '../components/ScoreInputModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
@@ -30,13 +30,13 @@ type EventRouteParams = {
 };
 
 function statusBadge(status: string) {
-  if (status === 'OPEN_FOR_REGISTRATION') return <Badge variant="primary">Регистрация</Badge>;
-  if (status === 'IN_PROGRESS') return <Badge variant="amber">В процессе</Badge>;
-  if (status === 'FINISHED') return <Badge>Завершено</Badge>;
-  if (status === 'REGISTRATION_CLOSED') return <Badge variant="amber">Регистрация закрыта</Badge>;
-  if (status === 'DRAFT') return <Badge>Черновик</Badge>;
-  if (status === 'CANCELLED') return <Badge variant="destructive">Отменена</Badge>;
-  return <Badge>{status}</Badge>;
+  if (status === 'OPEN_FOR_REGISTRATION') return <PillBadge tone="primary" filled>Регистрация</PillBadge>;
+  if (status === 'IN_PROGRESS') return <PillBadge tone="amber" filled>В процессе</PillBadge>;
+  if (status === 'FINISHED') return <PillBadge tone="neutral" filled>Завершено</PillBadge>;
+  if (status === 'REGISTRATION_CLOSED') return <PillBadge tone="amber" filled>Регистрация закрыта</PillBadge>;
+  if (status === 'DRAFT') return <PillBadge tone="neutral" filled>Черновик</PillBadge>;
+  if (status === 'CANCELLED') return <PillBadge tone="destructive" filled>Отменена</PillBadge>;
+  return <PillBadge tone="neutral" filled>{status}</PillBadge>;
 }
 
 export default function EventDetailsScreen() {
@@ -124,7 +124,7 @@ export default function EventDetailsScreen() {
     <>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 60, gap: 14 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -133,44 +133,38 @@ export default function EventDetailsScreen() {
           />
         }
       >
-        {/* Top card — meta */}
-        <Card style={{ padding: 16 }}>
-          <View style={styles.topRow}>
+        {/* Top hero card */}
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.eventTitle}>{e.title}</Text>
-              <Text style={styles.author}>Автор: {data.authorName}</Text>
+              <Text style={styles.heroTitle}>{e.title}</Text>
+              <Text style={styles.heroAuthor}>Автор: {data.authorName}</Text>
             </View>
             {statusBadge(e.status)}
           </View>
 
           <View style={styles.metaGrid}>
-            <View style={styles.metaItem}>
-              <Calendar size={14} color={colors.textMuted} />
-              <Text style={styles.metaText}>{e.date}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Clock size={14} color={colors.textMuted} />
-              <Text style={styles.metaText}>
-                {e.startTime?.slice(0, 5)}–{e.endTime?.slice(0, 5)}
-              </Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Users size={14} color={colors.textMuted} />
-              <Text style={styles.metaText}>{e.registeredCount}/{e.courtsCount * 4}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Trophy size={14} color={colors.textMuted} />
-              <Text style={styles.metaText}>
-                {e.pairingMode === 'BALANCED' ? 'Равный бой' : 'Каждый с каждым'}
-              </Text>
-            </View>
+            <MetaItem icon={<Calendar size={14} color={colors.primary} />} text={e.date} />
+            <MetaItem
+              icon={<Clock size={14} color={colors.primary} />}
+              text={`${e.startTime?.slice(0, 5)}–${e.endTime?.slice(0, 5)}`}
+            />
+            <MetaItem
+              icon={<Users size={14} color={colors.primary} />}
+              text={`${e.registeredCount}/${e.courtsCount * 4}`}
+            />
+            <MetaItem
+              icon={<Trophy size={14} color={colors.primary} />}
+              text={e.pairingMode === 'BALANCED' ? 'Равный бой' : 'Каждый с каждым'}
+            />
           </View>
-        </Card>
+        </View>
 
         {/* Player actions */}
         {!data.isAuthor && canRegister && (
           <Button
             variant={isRegistered ? 'outline' : 'default'}
+            size="lg"
             onPress={() => {
               if (!user?.playerId) return;
               if (isRegistered) action('Отмена', () => api.cancelRegistration(eventId));
@@ -178,11 +172,6 @@ export default function EventDetailsScreen() {
             }}
             disabled={busy}
             fullWidth
-            leftIcon={
-              isRegistered
-                ? <X size={16} color={colors.text} />
-                : <Check size={16} color={colors.primaryFg} />
-            }
           >
             {isRegistered ? 'Отменить регистрацию' : 'Записаться'}
           </Button>
@@ -278,7 +267,7 @@ export default function EventDetailsScreen() {
                   }))}
                 disabled={busy}
                 leftIcon={<Trash2 size={14} color={colors.danger} />}
-                style={{ borderColor: colors.destructiveTintBorder }}
+                style={{ borderColor: 'rgba(239,68,68,0.4)' }}
                 fullWidth
               >
                 <Text style={{ color: colors.danger, fontWeight: '600' }}>Удалить игру</Text>
@@ -289,10 +278,12 @@ export default function EventDetailsScreen() {
 
         {/* Pending cancel */}
         {data.isAuthor && data.pendingCancelRequests.length > 0 && (
-          <Card style={{ padding: 14, borderColor: colors.warning }}>
-            <Text style={[styles.sectionTitle, { color: colors.warningFg }]}>
-              Запросы на отмену ({data.pendingCancelRequests.length})
-            </Text>
+          <SectionCard
+            icon={<X size={18} color={colors.warningFg} />}
+            title="Запросы на отмену"
+            subtitle={`${data.pendingCancelRequests.length} ожидают подтверждения`}
+            style={{ borderColor: 'rgba(245,158,11,0.40)' }}
+          >
             {data.pendingCancelRequests.map((p) => (
               <View key={p.id} style={styles.smallRow}>
                 <Text style={styles.playerName}>{p.name}</Text>
@@ -301,20 +292,22 @@ export default function EventDetailsScreen() {
                   variant="outline"
                   onPress={() => confirm('Подтвердить?', p.name,
                     () => action('Отмена', () => api.approveCancel(eventId, p.id)))}
-                  style={{ borderColor: colors.destructiveTintBorder }}
                 >
-                  <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '500' }}>Подтвердить</Text>
+                  Подтвердить
                 </Button>
               </View>
             ))}
-          </Card>
+          </SectionCard>
         )}
 
         {/* Registered */}
         {data.registeredPlayers.length > 0 && (
-          <Card style={{ padding: 14 }}>
-            <Text style={styles.sectionTitle}>Записаны ({data.registeredPlayers.length})</Text>
-            <View style={{ marginTop: 8, gap: 6 }}>
+          <SectionCard
+            icon={<Users size={18} color={colors.primary} />}
+            title="Записаны"
+            subtitle={`${data.registeredPlayers.length} ${data.registeredPlayers.length === 1 ? 'игрок' : 'игроков'}`}
+          >
+            <View style={{ gap: 6 }}>
               {data.registeredPlayers.map((p) => (
                 <View key={p.id} style={styles.playerCard}>
                   <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={28} />
@@ -325,7 +318,6 @@ export default function EventDetailsScreen() {
                       onPress={() => confirm('Удалить игрока?', p.name,
                         () => action('Удалить', () => api.removePlayerFromEvent(eventId, p.id)))}
                       hitSlop={10}
-                      style={{ padding: 4 }}
                     >
                       <X size={16} color={colors.danger} />
                     </TouchableOpacity>
@@ -333,24 +325,27 @@ export default function EventDetailsScreen() {
                 </View>
               ))}
             </View>
-          </Card>
+          </SectionCard>
         )}
 
         {/* Sent invites */}
         {data.isAuthor && invites.length > 0 && (
-          <Card style={{ padding: 14 }}>
-            <Text style={styles.sectionTitle}>Приглашения ({invites.length})</Text>
-            <View style={{ marginTop: 8, gap: 6 }}>
+          <SectionCard
+            icon={<UserPlus size={18} color={colors.primary} />}
+            title="Приглашения"
+            subtitle={`${invites.length} отправлено`}
+          >
+            <View style={{ gap: 6 }}>
               {invites.map((inv) => (
                 <View key={inv.publicId} style={styles.smallRow}>
                   <Text style={styles.playerName}>{inv.name}</Text>
-                  {inv.status === 'ACCEPTED' ? <Badge variant="primary">принято</Badge>
-                    : inv.status === 'DECLINED' ? <Badge variant="destructive">отклонено</Badge>
-                    : <Badge variant="amber">ожидает</Badge>}
+                  {inv.status === 'ACCEPTED' ? <PillBadge tone="primary" filled>принято</PillBadge>
+                    : inv.status === 'DECLINED' ? <PillBadge tone="destructive" filled>отклонено</PillBadge>
+                    : <PillBadge tone="amber" filled>ожидает</PillBadge>}
                 </View>
               ))}
             </View>
-          </Card>
+          </SectionCard>
         )}
 
         {/* Rounds */}
@@ -393,6 +388,15 @@ export default function EventDetailsScreen() {
   );
 }
 
+function MetaItem({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <View style={styles.metaItem}>
+      {icon}
+      <Text style={styles.metaText} numberOfLines={1}>{text}</Text>
+    </View>
+  );
+}
+
 function RoundCard({
   round, isActive, canSubmitScore, isAuthor, onScorePress, onDeleteRound,
 }: {
@@ -405,29 +409,25 @@ function RoundCard({
 }) {
   const allFinished = round.matches.every((m) => m.status === 'FINISHED');
   return (
-    <Card
-      style={[
-        { padding: 14 },
-        isActive && { borderColor: colors.primary, borderWidth: 2 },
-      ]}
-    >
-      <View style={styles.roundHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={styles.sectionTitle}>Раунд {round.roundNumber}</Text>
-          {isActive && <Badge variant="primary">сейчас</Badge>}
-        </View>
-        {isAuthor && !allFinished && (
+    <SectionCard
+      icon={<Trophy size={18} color={isActive ? colors.warningFg : colors.primary} />}
+      title={`Раунд ${round.roundNumber}`}
+      subtitle={isActive ? 'Идёт сейчас' : allFinished ? 'Сыгран' : 'Не сыгран'}
+      style={isActive ? { borderColor: colors.primary, borderWidth: 2 } : undefined}
+      right={
+        isAuthor && !allFinished ? (
           <TouchableOpacity onPress={onDeleteRound} hitSlop={10}>
             <Trash2 size={14} color={colors.danger} />
           </TouchableOpacity>
-        )}
-      </View>
-      <View style={{ marginTop: 10, gap: 8 }}>
+        ) : isActive ? <PillBadge tone="primary" filled>сейчас</PillBadge> : null
+      }
+    >
+      <View style={{ gap: 8 }}>
         {round.matches.map((m) => (
           <MatchRow key={m.id} match={m} canSubmitScore={canSubmitScore} onPress={() => onScorePress(m)} />
         ))}
       </View>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -454,7 +454,7 @@ function MatchRow({
           {match.courtName ?? `Корт ${match.courtNumber}`}
         </Text>
         {finished
-          ? <Badge variant="primary">завершён</Badge>
+          ? <PillBadge tone="primary" filled>завершён</PillBadge>
           : canSubmitScore && <ChevronRight size={14} color={colors.textMuted} />}
       </View>
 
@@ -492,21 +492,33 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   error: { color: colors.danger, fontSize: 14 },
 
-  topRow: {
+  hero: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
+  },
+  heroTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  eventTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  author: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  heroTitle: { color: colors.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
+  heroAuthor: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
 
-  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, rowGap: 8 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { color: colors.text, fontSize: 13 },
-
-  sectionTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.md,
+  },
+  metaText: { color: colors.text, fontSize: 12 },
 
   smallRow: {
     flexDirection: 'row',
@@ -517,25 +529,25 @@ const styles = StyleSheet.create({
   playerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(54,54,54,0.3)',
+    backgroundColor: 'rgba(54,54,54,0.30)',
     borderRadius: radii.md,
-    padding: 8,
+    padding: 10,
     gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   playerName: { color: colors.text, fontSize: 14 },
   playerRating: { color: colors.primary, fontSize: 14, fontWeight: '700' },
 
-  roundHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-
   matchRow: {
-    backgroundColor: 'rgba(54,54,54,0.3)',
+    backgroundColor: 'rgba(54,54,54,0.30)',
     borderRadius: radii.md,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
   matchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  courtLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  courtLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   matchTeams: { flexDirection: 'row', alignItems: 'center' },
   matchTeam: { flex: 1, gap: 4 },
   teamPlayer: { flexDirection: 'row', alignItems: 'center', gap: 6 },

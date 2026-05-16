@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Sparkles } from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { SurveyDef } from '../api/types';
-import { colors } from '../theme/colors';
+import { colors, radii } from '../theme/colors';
+import { Button } from '../components/ui/Button';
+import { PillBadge } from '../components/ui/PillBadge';
 
 export default function SurveyScreen() {
   const { refreshUser } = useAuth();
@@ -64,28 +67,31 @@ export default function SurveyScreen() {
     return <View style={styles.center}><Text style={styles.error}>{error ?? 'Тест недоступен'}</Text></View>;
   }
 
+  const progress = totalSteps > 1 ? step / (totalSteps - 1) : 0;
+
   return (
     <View style={styles.container}>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: totalSteps > 1 ? `${(step / (totalSteps - 1)) * 100}%` : '0%' },
-          ]}
-        />
-      </View>
-
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <PillBadge icon={<Sparkles size={12} color={colors.primary} />} tone="primary" filled>
+            Калибровка
+          </PillBadge>
+        </View>
+
         <Text style={styles.title}>Предварительный рейтинг</Text>
         <Text style={styles.subtitle}>
           Ответьте на несколько вопросов — это нужно один раз, чтобы подобрать стартовый рейтинг.
         </Text>
 
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+        </View>
+        <Text style={styles.stepInfo}>Вопрос {step + 1} из {totalSteps}</Text>
+
         {currentQuestion && (
           <View style={styles.card}>
-            <Text style={styles.stepInfo}>Вопрос {step + 1} из {totalSteps}</Text>
             <Text style={styles.qTitle}>{currentQuestion.title}</Text>
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 12, gap: 8 }}>
               {currentQuestion.options.map((opt) => {
                 const active = answers[currentQuestion.id] === opt.id;
                 return (
@@ -110,30 +116,32 @@ export default function SurveyScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
 
         <View style={styles.nav}>
-          <TouchableOpacity
-            style={[styles.navBtn, step === 0 && { opacity: 0.4 }]}
+          <Button
+            variant="outline"
             onPress={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0}
+            style={{ flex: 1 }}
           >
-            <Text style={styles.navBtnText}>Назад</Text>
-          </TouchableOpacity>
+            Назад
+          </Button>
 
           {!isLast ? (
-            <TouchableOpacity
-              style={[styles.navBtn, styles.navBtnPrimary, !canNext && { opacity: 0.4 }]}
+            <Button
               onPress={() => setStep((s) => s + 1)}
               disabled={!canNext}
+              style={{ flex: 1 }}
             >
-              <Text style={styles.navBtnPrimaryText}>Дальше</Text>
-            </TouchableOpacity>
+              Дальше
+            </Button>
           ) : (
-            <TouchableOpacity
-              style={[styles.navBtn, styles.navBtnPrimary, (!readyToSubmit || loading) && { opacity: 0.4 }]}
+            <Button
               onPress={submit}
-              disabled={!readyToSubmit || loading}
+              loading={loading}
+              disabled={!readyToSubmit}
+              style={{ flex: 1 }}
             >
-              {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.navBtnPrimaryText}>Готово</Text>}
-            </TouchableOpacity>
+              Готово
+            </Button>
           )}
         </View>
       </ScrollView>
@@ -144,55 +152,61 @@ export default function SurveyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  progressBar: {
-    height: 3,
-    backgroundColor: colors.border,
+
+  title: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: 12,
+    textAlign: 'center',
   },
-  progressFill: { height: 3, backgroundColor: colors.primary },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700' },
-  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 6, marginBottom: 20 },
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 8,
+    marginBottom: 18,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: colors.secondary,
+    borderRadius: radii.full,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: radii.full },
+  stepInfo: { color: colors.textMuted, fontSize: 12, marginTop: 8, marginBottom: 16, textAlign: 'center' },
+
   card: {
     backgroundColor: colors.bgCard,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: radii.xl,
+    padding: 18,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  stepInfo: { color: colors.textDim, fontSize: 12, marginBottom: 6 },
-  qTitle: { color: colors.text, fontSize: 17, fontWeight: '600' },
+  qTitle: { color: colors.text, fontSize: 17, fontWeight: '600', lineHeight: 24 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.bgElevated,
-    marginTop: 8,
+    backgroundColor: 'rgba(54,54,54,0.30)',
   },
-  optionActive: { borderColor: colors.primary },
+  optionActive: { borderColor: colors.primary, backgroundColor: 'rgba(34,197,94,0.10)' },
   radio: {
     width: 18, height: 18, borderRadius: 9,
-    borderWidth: 2, borderColor: colors.textDim,
+    borderWidth: 2, borderColor: colors.textMuted,
     marginRight: 10, alignItems: 'center', justifyContent: 'center',
   },
   radioActive: { borderColor: colors.primary },
   radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   optionText: { color: colors.textMuted, fontSize: 14, flex: 1 },
   optionTextActive: { color: colors.text, fontWeight: '500' },
+
   nav: { flexDirection: 'row', marginTop: 20, gap: 12 },
-  navBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bgCard,
-  },
-  navBtnText: { color: colors.textMuted, fontSize: 15 },
-  navBtnPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
-  navBtnPrimaryText: { color: '#000', fontSize: 15, fontWeight: '600' },
   error: { color: colors.danger, fontSize: 13, textAlign: 'center', marginTop: 12 },
 });
