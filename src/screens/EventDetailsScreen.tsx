@@ -10,10 +10,18 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import {
+  Calendar, Clock, Users, Trophy, Trash2, Pencil, UserPlus,
+  Play, Square, Flag, Plus, Check, X, ChevronRight, Crown,
+} from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { EventDetails, EventInviteStatusItem, Match, Round } from '../api/types';
-import { colors } from '../theme/colors';
+import { colors, radii } from '../theme/colors';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import PlayerAvatar from '../components/PlayerAvatar';
 import ScoreInputModal from '../components/ScoreInputModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
 
@@ -21,18 +29,19 @@ type EventRouteParams = {
   EventDetails: { eventId: string };
 };
 
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Черновик',
-  OPEN_FOR_REGISTRATION: 'Регистрация',
-  REGISTRATION_CLOSED: 'Регистрация закрыта',
-  IN_PROGRESS: 'Идёт',
-  FINISHED: 'Завершена',
-  CANCELLED: 'Отменена',
-};
+function statusBadge(status: string) {
+  if (status === 'OPEN_FOR_REGISTRATION') return <Badge variant="primary">Регистрация</Badge>;
+  if (status === 'IN_PROGRESS') return <Badge variant="amber">В процессе</Badge>;
+  if (status === 'FINISHED') return <Badge>Завершено</Badge>;
+  if (status === 'REGISTRATION_CLOSED') return <Badge variant="amber">Регистрация закрыта</Badge>;
+  if (status === 'DRAFT') return <Badge>Черновик</Badge>;
+  if (status === 'CANCELLED') return <Badge variant="destructive">Отменена</Badge>;
+  return <Badge>{status}</Badge>;
+}
 
 export default function EventDetailsScreen() {
   const route = useRoute<RouteProp<EventRouteParams, 'EventDetails'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { eventId } = route.params;
 
@@ -107,11 +116,15 @@ export default function EventDetailsScreen() {
   const canRegister = e.status === 'OPEN_FOR_REGISTRATION';
   const canSubmitScore = e.status === 'IN_PROGRESS';
 
+  const activeRoundId = e.status === 'IN_PROGRESS'
+    ? data.rounds.find((r) => r.matches.some((m) => m.status !== 'FINISHED'))?.id ?? null
+    : null;
+
   return (
     <>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -120,167 +133,241 @@ export default function EventDetailsScreen() {
           />
         }
       >
-        <View style={styles.card}>
-          <View style={styles.headRow}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{statusLabels[e.status] ?? e.status}</Text>
+        {/* Top card — meta */}
+        <Card style={{ padding: 16 }}>
+          <View style={styles.topRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.eventTitle}>{e.title}</Text>
+              <Text style={styles.author}>Автор: {data.authorName}</Text>
             </View>
-            <Text style={styles.author}>Автор: {data.authorName}</Text>
+            {statusBadge(e.status)}
           </View>
-          <Text style={styles.meta}>
-            📅 {e.date} · {e.startTime?.slice(0, 5)}–{e.endTime?.slice(0, 5)}
-          </Text>
-          <Text style={styles.meta}>
-            🎾 Игроков: {e.registeredCount} · Кортов: {e.courtsCount} · Раундов: {e.roundsPlanned}
-          </Text>
-          <Text style={styles.meta}>
-            🏓 Режим пар: {e.pairingMode === 'ROUND_ROBIN' ? 'Каждый с каждым' : 'Равный бой'}
-          </Text>
-        </View>
+
+          <View style={styles.metaGrid}>
+            <View style={styles.metaItem}>
+              <Calendar size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>{e.date}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Clock size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>
+                {e.startTime?.slice(0, 5)}–{e.endTime?.slice(0, 5)}
+              </Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Users size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>{e.registeredCount}/{e.courtsCount * 4}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Trophy size={14} color={colors.textMuted} />
+              <Text style={styles.metaText}>
+                {e.pairingMode === 'BALANCED' ? 'Равный бой' : 'Каждый с каждым'}
+              </Text>
+            </View>
+          </View>
+        </Card>
 
         {/* Player actions */}
         {!data.isAuthor && canRegister && (
-          <ActionButton
-            label={isRegistered ? 'Отменить регистрацию' : 'Записаться'}
-            tone={isRegistered ? 'danger' : 'primary'}
-            disabled={busy}
+          <Button
+            variant={isRegistered ? 'outline' : 'default'}
             onPress={() => {
               if (!user?.playerId) return;
               if (isRegistered) action('Отмена', () => api.cancelRegistration(eventId));
               else action('Регистрация', () => api.registerForEvent(eventId, user.playerId));
             }}
-          />
+            disabled={busy}
+            fullWidth
+            leftIcon={
+              isRegistered
+                ? <X size={16} color={colors.text} />
+                : <Check size={16} color={colors.primaryFg} />
+            }
+          >
+            {isRegistered ? 'Отменить регистрацию' : 'Записаться'}
+          </Button>
         )}
 
         {/* Author actions */}
         {data.isAuthor && (
-          <View style={{ marginTop: 12 }}>
+          <View style={{ gap: 8 }}>
             {(e.status === 'DRAFT' || e.status === 'OPEN_FOR_REGISTRATION' || e.status === 'REGISTRATION_CLOSED') && (
-              <ActionButton label="✎ Редактировать игру" disabled={busy}
-                onPress={() => (navigation as any).navigate('EditEvent', { eventId })} />
-            )}
-            {(e.status === 'OPEN_FOR_REGISTRATION' || e.status === 'REGISTRATION_CLOSED') && (
-              <ActionButton label="👥 Добавить друзей" disabled={busy}
-                onPress={() => setInviteOpen(true)} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button
+                  variant="outline"
+                  onPress={() => navigation.navigate('EditEvent', { eventId })}
+                  disabled={busy}
+                  leftIcon={<Pencil size={14} color={colors.text} />}
+                  style={{ flex: 1 }}
+                >
+                  Редактировать
+                </Button>
+                <Button
+                  variant="outline"
+                  onPress={() => setInviteOpen(true)}
+                  disabled={busy}
+                  leftIcon={<UserPlus size={14} color={colors.text} />}
+                  style={{ flex: 1 }}
+                >
+                  Друзья
+                </Button>
+              </View>
             )}
             {e.status === 'OPEN_FOR_REGISTRATION' && (
-              <ActionButton label="Закрыть регистрацию" disabled={busy}
-                onPress={() => action('Закрыть', () => api.closeRegistration(eventId))} />
+              <Button
+                onPress={() => action('Закрыть', () => api.closeRegistration(eventId))}
+                disabled={busy}
+                leftIcon={<Square size={14} color={colors.primaryFg} />}
+                fullWidth
+              >
+                Закрыть регистрацию
+              </Button>
             )}
             {e.status === 'REGISTRATION_CLOSED' && (
-              <ActionButton label="Начать игру" tone="primary" disabled={busy}
-                onPress={() => action('Старт', () => api.startEvent(eventId))} />
+              <Button
+                onPress={() => action('Старт', () => api.startEvent(eventId))}
+                disabled={busy}
+                leftIcon={<Play size={14} color={colors.primaryFg} />}
+                fullWidth
+              >
+                Начать игру
+              </Button>
             )}
             {e.status === 'IN_PROGRESS' && (
-              <>
-                <ActionButton label="+ Добавить раунд" disabled={busy}
-                  onPress={() => action('Добавить раунд', () => api.addRound(eventId))} />
-                <ActionButton label="🏆 Финальный раунд" disabled={busy}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button
+                  variant="outline"
+                  onPress={() => action('Раунд', () => api.addRound(eventId))}
+                  disabled={busy}
+                  leftIcon={<Plus size={14} color={colors.text} />}
+                  style={{ flex: 1 }}
+                >
+                  Раунд
+                </Button>
+                <Button
+                  variant="outline"
                   onPress={() => confirm('Финальный раунд?', 'Сильные vs сильные.',
-                    () => action('Финал', () => api.addFinalRound(eventId)))} />
-                <ActionButton label="Завершить игру" tone="warning" disabled={busy}
-                  onPress={() => confirm('Завершить игру?', 'После этого начислится рейтинг.',
-                    () => action('Финиш', () => api.finishEvent(eventId)))} />
-              </>
+                    () => action('Финал', () => api.addFinalRound(eventId)))}
+                  disabled={busy}
+                  leftIcon={<Crown size={14} color={colors.warningFg} />}
+                  style={{ flex: 1 }}
+                >
+                  Финал
+                </Button>
+              </View>
+            )}
+            {e.status === 'IN_PROGRESS' && (
+              <Button
+                variant="outline"
+                onPress={() => confirm('Завершить игру?', 'После этого начислится рейтинг.',
+                  () => action('Финиш', () => api.finishEvent(eventId)))}
+                disabled={busy}
+                leftIcon={<Flag size={14} color={colors.warningFg} />}
+                fullWidth
+              >
+                Завершить игру
+              </Button>
             )}
             {e.status !== 'FINISHED' && e.status !== 'CANCELLED' && (
-              <ActionButton label="Удалить игру" tone="danger" disabled={busy}
+              <Button
+                variant="outline"
                 onPress={() => confirm('Удалить игру?', 'Действие необратимо.',
                   () => action('Удалить', async () => {
                     await api.deleteEvent(eventId);
                     navigation.goBack();
-                  }))} />
+                  }))}
+                disabled={busy}
+                leftIcon={<Trash2 size={14} color={colors.danger} />}
+                style={{ borderColor: colors.destructiveTintBorder }}
+                fullWidth
+              >
+                <Text style={{ color: colors.danger, fontWeight: '600' }}>Удалить игру</Text>
+              </Button>
             )}
           </View>
         )}
 
-        {/* Pending cancel requests (author only) */}
+        {/* Pending cancel */}
         {data.isAuthor && data.pendingCancelRequests.length > 0 && (
-          <View style={[styles.card, { marginTop: 16, borderColor: colors.warning }]}>
-            <Text style={[styles.sectionTitle, { color: colors.warning }]}>
+          <Card style={{ padding: 14, borderColor: colors.warning }}>
+            <Text style={[styles.sectionTitle, { color: colors.warningFg }]}>
               Запросы на отмену ({data.pendingCancelRequests.length})
             </Text>
             {data.pendingCancelRequests.map((p) => (
-              <View key={p.id} style={styles.playerRow}>
+              <View key={p.id} style={styles.smallRow}>
                 <Text style={styles.playerName}>{p.name}</Text>
-                <TouchableOpacity
-                  onPress={() => confirm('Подтвердить отмену?', p.name,
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onPress={() => confirm('Подтвердить?', p.name,
                     () => action('Отмена', () => api.approveCancel(eventId, p.id)))}
-                  style={styles.smallBtn}
+                  style={{ borderColor: colors.destructiveTintBorder }}
                 >
-                  <Text style={[styles.smallBtnText, { color: colors.danger }]}>Подтвердить</Text>
-                </TouchableOpacity>
+                  <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '500' }}>Подтвердить</Text>
+                </Button>
               </View>
             ))}
-          </View>
+          </Card>
         )}
 
-        {/* Registered players */}
+        {/* Registered */}
         {data.registeredPlayers.length > 0 && (
-          <View style={[styles.card, { marginTop: 16 }]}>
+          <Card style={{ padding: 14 }}>
             <Text style={styles.sectionTitle}>Записаны ({data.registeredPlayers.length})</Text>
-            {data.registeredPlayers.map((p) => (
-              <View key={p.id} style={styles.playerRow}>
-                <Text style={styles.playerName}>{p.name}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ marginTop: 8, gap: 6 }}>
+              {data.registeredPlayers.map((p) => (
+                <View key={p.id} style={styles.playerCard}>
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={28} />
+                  <Text style={[styles.playerName, { flex: 1 }]}>{p.name}</Text>
                   <Text style={styles.playerRating}>{p.rating}</Text>
                   {data.isAuthor && p.id !== user?.playerId && e.status !== 'IN_PROGRESS' && e.status !== 'FINISHED' && (
                     <TouchableOpacity
                       onPress={() => confirm('Удалить игрока?', p.name,
                         () => action('Удалить', () => api.removePlayerFromEvent(eventId, p.id)))}
                       hitSlop={10}
+                      style={{ padding: 4 }}
                     >
-                      <Text style={{ color: colors.danger, fontSize: 18 }}>×</Text>
+                      <X size={16} color={colors.danger} />
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </Card>
         )}
 
         {/* Sent invites */}
         {data.isAuthor && invites.length > 0 && (
-          <View style={[styles.card, { marginTop: 16 }]}>
+          <Card style={{ padding: 14 }}>
             <Text style={styles.sectionTitle}>Приглашения ({invites.length})</Text>
-            {invites.map((inv) => {
-              const color =
-                inv.status === 'ACCEPTED' ? colors.success :
-                inv.status === 'DECLINED' ? colors.danger : colors.warning;
-              const label =
-                inv.status === 'ACCEPTED' ? 'принято' :
-                inv.status === 'DECLINED' ? 'отклонено' : 'ожидает';
-              return (
-                <View key={inv.publicId} style={styles.playerRow}>
+            <View style={{ marginTop: 8, gap: 6 }}>
+              {invites.map((inv) => (
+                <View key={inv.publicId} style={styles.smallRow}>
                   <Text style={styles.playerName}>{inv.name}</Text>
-                  <Text style={{ color, fontSize: 12 }}>{label}</Text>
+                  {inv.status === 'ACCEPTED' ? <Badge variant="primary">принято</Badge>
+                    : inv.status === 'DECLINED' ? <Badge variant="destructive">отклонено</Badge>
+                    : <Badge variant="amber">ожидает</Badge>}
                 </View>
-              );
-            })}
-          </View>
+              ))}
+            </View>
+          </Card>
         )}
 
         {/* Rounds */}
-        {(() => {
-          // Active round = the lowest round number with any non-finished match (while IN_PROGRESS)
-          const activeRoundId = e.status === 'IN_PROGRESS'
-            ? data.rounds.find((r) => r.matches.some((m) => m.status !== 'FINISHED'))?.id ?? null
-            : null;
-          return data.rounds.map((r) => (
-            <RoundCard
-              key={r.id}
-              round={r}
-              isActive={r.id === activeRoundId}
-              canSubmitScore={canSubmitScore}
-              isAuthor={data.isAuthor}
-              onScorePress={(m) => setScoreMatch(m)}
-              onDeleteRound={() =>
-                confirm('Удалить раунд?', `Раунд ${r.roundNumber}`,
-                  () => action('Удалить раунд', () => api.deleteRound(eventId, r.id)))
-              }
-            />
-          ));
-        })()}
+        {data.rounds.map((r) => (
+          <RoundCard
+            key={r.id}
+            round={r}
+            isActive={r.id === activeRoundId}
+            canSubmitScore={canSubmitScore}
+            isAuthor={data.isAuthor}
+            onScorePress={(m) => setScoreMatch(m)}
+            onDeleteRound={() =>
+              confirm('Удалить раунд?', `Раунд ${r.roundNumber}`,
+                () => action('Удалить раунд', () => api.deleteRound(eventId, r.id)))
+            }
+          />
+        ))}
       </ScrollView>
 
       <ScoreInputModal
@@ -307,12 +394,7 @@ export default function EventDetailsScreen() {
 }
 
 function RoundCard({
-  round,
-  isActive,
-  canSubmitScore,
-  isAuthor,
-  onScorePress,
-  onDeleteRound,
+  round, isActive, canSubmitScore, isAuthor, onScorePress, onDeleteRound,
 }: {
   round: Round;
   isActive: boolean;
@@ -323,38 +405,36 @@ function RoundCard({
 }) {
   const allFinished = round.matches.every((m) => m.status === 'FINISHED');
   return (
-    <View style={[
-      styles.card,
-      { marginTop: 16 },
-      isActive && { borderColor: colors.primary, borderWidth: 2 },
-    ]}>
-      <View style={styles.headRow}>
+    <Card
+      style={[
+        { padding: 14 },
+        isActive && { borderColor: colors.primary, borderWidth: 2 },
+      ]}
+    >
+      <View style={styles.roundHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={styles.sectionTitle}>Раунд {round.roundNumber}</Text>
-          {isActive && (
-            <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>● сейчас</Text>
-            </View>
-          )}
+          {isActive && <Badge variant="primary">сейчас</Badge>}
         </View>
         {isAuthor && !allFinished && (
-          <TouchableOpacity onPress={onDeleteRound}>
-            <Text style={styles.deleteRound}>удалить</Text>
+          <TouchableOpacity onPress={onDeleteRound} hitSlop={10}>
+            <Trash2 size={14} color={colors.danger} />
           </TouchableOpacity>
         )}
       </View>
-      {round.matches.map((m) => (
-        <MatchRow key={m.id} match={m} canSubmitScore={canSubmitScore} onPress={() => onScorePress(m)} />
-      ))}
-    </View>
+      <View style={{ marginTop: 10, gap: 8 }}>
+        {round.matches.map((m) => (
+          <MatchRow key={m.id} match={m} canSubmitScore={canSubmitScore} onPress={() => onScorePress(m)} />
+        ))}
+      </View>
+    </Card>
   );
 }
 
-function MatchRow({ match, canSubmitScore, onPress }:
-  { match: Match; canSubmitScore: boolean; onPress: () => void }) {
+function MatchRow({
+  match, canSubmitScore, onPress,
+}: { match: Match; canSubmitScore: boolean; onPress: () => void }) {
   const finished = match.status === 'FINISHED';
-  const teamA = match.teamA.map((p) => p.name).join(' / ');
-  const teamB = match.teamB.map((p) => p.name).join(' / ');
   const scoreText = (() => {
     if (!match.score) return null;
     if (match.score.points) return `${match.score.points.teamAPoints} : ${match.score.points.teamBPoints}`;
@@ -364,125 +444,103 @@ function MatchRow({ match, canSubmitScore, onPress }:
 
   return (
     <TouchableOpacity
-      style={[styles.matchRow, finished && styles.matchRowDone]}
+      style={[styles.matchRow, finished && { opacity: 0.75 }]}
       disabled={!canSubmitScore}
       onPress={onPress}
+      activeOpacity={0.8}
     >
-      <Text style={styles.courtLabel}>{match.courtName ?? `Корт ${match.courtNumber}`}</Text>
-      <View style={styles.teamRow}>
-        <Text style={styles.teamText} numberOfLines={2}>{teamA}</Text>
-        <Text style={styles.vs}>vs</Text>
-        <Text style={[styles.teamText, { textAlign: 'right' }]} numberOfLines={2}>{teamB}</Text>
+      <View style={styles.matchHeader}>
+        <Text style={styles.courtLabel}>
+          {match.courtName ?? `Корт ${match.courtNumber}`}
+        </Text>
+        {finished
+          ? <Badge variant="primary">завершён</Badge>
+          : canSubmitScore && <ChevronRight size={14} color={colors.textMuted} />}
       </View>
-      {scoreText && <Text style={styles.scoreText}>{scoreText}</Text>}
-      {!finished && canSubmitScore && <Text style={styles.tapHint}>Тап — ввести счёт</Text>}
-    </TouchableOpacity>
-  );
-}
 
-function ActionButton({
-  label, onPress, tone = 'default', disabled,
-}: { label: string; onPress: () => void; tone?: 'default' | 'primary' | 'danger' | 'warning'; disabled?: boolean }) {
-  const styleMap = {
-    default: { bg: colors.bgCard, fg: colors.text, border: colors.border },
-    primary: { bg: colors.primary, fg: '#000', border: colors.primary },
-    danger: { bg: colors.bgCard, fg: colors.danger, border: colors.danger },
-    warning: { bg: colors.bgCard, fg: colors.warning, border: colors.warning },
-  }[tone];
-  return (
-    <TouchableOpacity
-      style={[styles.actionButton, { backgroundColor: styleMap.bg, borderColor: styleMap.border }, disabled && { opacity: 0.5 }]}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      <Text style={[styles.actionText, { color: styleMap.fg }]}>{label}</Text>
+      <View style={styles.matchTeams}>
+        <View style={styles.matchTeam}>
+          {match.teamA.map((p, i) => (
+            <View key={i} style={styles.teamPlayer}>
+              <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={22} />
+              <Text style={styles.teamPlayerName} numberOfLines={1}>{p.name}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.scoreBox}>
+          {scoreText
+            ? <Text style={styles.scoreText}>{scoreText}</Text>
+            : <Text style={styles.scoreEmpty}>vs</Text>}
+        </View>
+
+        <View style={[styles.matchTeam, { alignItems: 'flex-end' }]}>
+          {match.teamB.map((p, i) => (
+            <View key={i} style={[styles.teamPlayer, { flexDirection: 'row-reverse' }]}>
+              <PlayerAvatar name={p.name} avatarUrl={p.avatarUrl} size={22} />
+              <Text style={styles.teamPlayerName} numberOfLines={1}>{p.name}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, padding: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   error: { color: colors.danger, fontSize: 14 },
-  card: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
   },
-  headRow: {
+  eventTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  author: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+
+  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, rowGap: 8 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { color: colors.text, fontSize: 13 },
+
+  sectionTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
+
+  smallRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  badge: {
-    backgroundColor: colors.bgElevated,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  badgeText: { color: colors.textMuted, fontSize: 11 },
-  author: { color: colors.textDim, fontSize: 12 },
-  meta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
-  sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 8 },
-  playerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  },
+  playerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    borderRadius: radii.md,
+    padding: 8,
+    gap: 10,
   },
   playerName: { color: colors.text, fontSize: 14 },
-  playerRating: { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  actionButton: {
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  actionText: { fontSize: 15, fontWeight: '600' },
+  playerRating: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+
+  roundHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
   matchRow: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: 8,
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    borderRadius: radii.md,
     padding: 10,
-    marginTop: 8,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  matchRowDone: { opacity: 0.7 },
-  courtLabel: { color: colors.textDim, fontSize: 11, marginBottom: 4 },
-  teamRow: { flexDirection: 'row', alignItems: 'center' },
-  teamText: { color: colors.text, fontSize: 13, flex: 1 },
-  vs: { color: colors.textDim, fontSize: 11, marginHorizontal: 8 },
-  scoreText: {
-    color: colors.primary,
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  tapHint: { color: colors.textDim, fontSize: 11, textAlign: 'center', marginTop: 4 },
-  deleteRound: { color: colors.danger, fontSize: 12 },
-  smallBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  smallBtnText: { fontSize: 12, fontWeight: '600' },
-  activeBadge: {
-    backgroundColor: 'rgba(16,185,129,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  activeBadgeText: { color: colors.primary, fontSize: 10, fontWeight: '600' },
+  matchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  courtLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  matchTeams: { flexDirection: 'row', alignItems: 'center' },
+  matchTeam: { flex: 1, gap: 4 },
+  teamPlayer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  teamPlayerName: { color: colors.text, fontSize: 12, flex: 1 },
+  scoreBox: { paddingHorizontal: 8, alignItems: 'center', minWidth: 60 },
+  scoreText: { color: colors.primary, fontSize: 18, fontWeight: '700' },
+  scoreEmpty: { color: colors.textDim, fontSize: 12 },
 });

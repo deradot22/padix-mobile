@@ -3,58 +3,91 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Calendar, Clock, List, Plus, Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import type { Event } from '../api/types';
-import { colors } from '../theme/colors';
+import { colors, radii } from '../theme/colors';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Черновик',
-  OPEN_FOR_REGISTRATION: 'Регистрация',
-  REGISTRATION_CLOSED: 'Регистрация закрыта',
-  IN_PROGRESS: 'Идёт',
-  FINISHED: 'Завершена',
-  CANCELLED: 'Отменена',
-};
+function formatDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${d.getDate()}`.padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-const statusColors: Record<string, string> = {
-  OPEN_FOR_REGISTRATION: colors.success,
-  IN_PROGRESS: colors.primary,
-  REGISTRATION_CLOSED: colors.warning,
-};
+function shortDate(s: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return s;
+  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+  return `${parseInt(m[3])} ${months[d.getMonth()]}`;
+}
+
+function timeRange(start: string, end: string): string {
+  return `${start?.slice(0, 5)}–${end?.slice(0, 5)}`;
+}
+
+function getStatusBadge(status: Event['status']) {
+  if (status === 'OPEN_FOR_REGISTRATION') return <Badge variant="primary">Регистрация</Badge>;
+  if (status === 'IN_PROGRESS') return <Badge variant="amber">В процессе</Badge>;
+  if (status === 'FINISHED') return <Badge>Завершено</Badge>;
+  if (status === 'REGISTRATION_CLOSED') return <Badge variant="amber">Закрыта</Badge>;
+  return <Badge>{status}</Badge>;
+}
 
 type ViewMode = 'list' | 'calendar';
 
 export default function GamesScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<ViewMode>('list');
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>('list');
+  const [registeredIds, setRegisteredIds] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await api.upcomingEvents();
-      setEvents(data);
+      const now = new Date();
+      const from = formatDate(now);
+      const to = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14));
+      const data = await api.upcomingEvents(from, to);
+      const upcoming = data.filter((e) => e.status !== 'FINISHED');
+      setEvents(upcoming);
+
+      // Fetch which we're registered for
+      if (user?.playerId && upcoming.length > 0) {
+        try {
+          const details = await Promise.all(upcoming.map((e) => api.eventDetails(e.id)));
+          const map: Record<string, boolean> = {};
+          details.forEach((d) => {
+            map[d.event.id] = d.registeredPlayers.some((p) => p.id === user.playerId);
+          });
+          setRegisteredIds(map);
+        } catch {
+          setRegisteredIds({});
+        }
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Не удалось загрузить игры');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.playerId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -64,102 +97,133 @@ export default function GamesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.createBtn}
-          onPress={() => navigation.navigate('CreateEvent')}
-        >
-          <Text style={styles.createBtnText}>+ Создать</Text>
-        </TouchableOpacity>
-        <View style={styles.modeSwitch}>
-          <ModeBtn label="Список" active={mode === 'list'} onPress={() => setMode('list')} />
-          <ModeBtn label="Календарь" active={mode === 'calendar'} onPress={() => setMode('calendar')} />
-        </View>
-      </View>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        <PageHeader
+          title="Игры"
+          subtitle="Выберите игру для участия"
+          right={
+            <Button
+              size="sm"
+              onPress={() => navigation.navigate('CreateEvent')}
+              leftIcon={<Plus size={16} color={colors.primaryFg} />}
+            >
+              Создать
+            </Button>
+          }
+        />
 
-      {mode === 'list' ? (
-        <FlatList
-          data={events}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(); }}
-              tintColor={colors.primary}
-            />
-          }
-          ListEmptyComponent={
+        <View style={styles.toggle}>
+          <ToggleBtn
+            active={view === 'list'}
+            label="Игры"
+            icon={<List size={14} color={view === 'list' ? colors.primaryFg : colors.textMuted} />}
+            onPress={() => setView('list')}
+          />
+          <ToggleBtn
+            active={view === 'calendar'}
+            label="Календарь"
+            icon={<Calendar size={14} color={view === 'calendar' ? colors.primaryFg : colors.textMuted} />}
+            onPress={() => setView('calendar')}
+          />
+        </View>
+
+        {view === 'list' ? (
+          events.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>{error ?? 'Игр пока нет'}</Text>
+              <Text style={styles.emptyText}>{error ?? 'Ближайших игр нет'}</Text>
             </View>
-          }
-          renderItem={({ item }) => <EventCard event={item} onPress={() => navigation.navigate('EventDetails', { eventId: item.id })} />}
-        />
-      ) : (
-        <CalendarView
-          events={events}
-          month={month}
-          setMonth={setMonth}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          onEventPress={(id) => navigation.navigate('EventDetails', { eventId: id })}
-        />
-      )}
+          ) : (
+            <View style={{ gap: 8 }}>
+              {events.map((e) => (
+                <EventListRow
+                  key={e.id}
+                  event={e}
+                  registered={registeredIds[e.id]}
+                  onPress={() => navigation.navigate('EventDetails', { eventId: e.id })}
+                />
+              ))}
+            </View>
+          )
+        ) : (
+          <CalendarView
+            events={events}
+            onEventPress={(id) => navigation.navigate('EventDetails', { eventId: id })}
+          />
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-function ModeBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function ToggleBtn({
+  active, label, icon, onPress,
+}: { active: boolean; label: string; icon: React.ReactNode; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[styles.modeBtn, active && styles.modeBtnActive]} onPress={onPress}>
-      <Text style={[styles.modeBtnText, active && styles.modeBtnTextActive]}>{label}</Text>
+    <TouchableOpacity style={[styles.toggleBtn, active && styles.toggleBtnActive]} onPress={onPress}>
+      {icon}
+      <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
-function EventCard({ event, onPress }: { event: Event; onPress: () => void }) {
+function EventListRow({
+  event, registered, onPress,
+}: { event: Event; registered?: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{event.title}</Text>
-        <View style={[styles.badge, { borderColor: statusColors[event.status] ?? colors.border }]}>
-          <Text style={[styles.badgeText, { color: statusColors[event.status] ?? colors.textMuted }]}>
-            {statusLabels[event.status] ?? event.status}
+    <TouchableOpacity style={styles.eventRow} onPress={onPress} activeOpacity={0.7}>
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        {event.title && (
+          <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+        )}
+        <View style={styles.metaRow}>
+          <Calendar size={14} color={colors.textMuted} />
+          <Text style={styles.metaText}>{shortDate(event.date)}</Text>
+          <Text style={styles.metaText}>{timeRange(event.startTime, event.endTime)}</Text>
+        </View>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>
+            {event.pairingMode === 'BALANCED' ? 'Баланс' : 'Каждый с каждым'}
           </Text>
+          <Text style={styles.dot}>·</Text>
+          <Users size={14} color={colors.textMuted} />
+          <Text style={styles.metaText}>{event.registeredCount}/{event.courtsCount * 4}</Text>
         </View>
       </View>
-      <Text style={styles.meta}>
-        📅 {event.date} · {event.startTime?.slice(0, 5)}–{event.endTime?.slice(0, 5)}
-      </Text>
-      <Text style={styles.meta}>
-        👥 {event.registeredCount} · 🎾 {event.courtsCount} кортов · {event.roundsPlanned} раундов
-      </Text>
+      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+        {registered && <Badge variant="primary">Вы записаны</Badge>}
+        {getStatusBadge(event.status)}
+      </View>
     </TouchableOpacity>
   );
 }
 
 function CalendarView({
-  events, month, setMonth, selectedDate, setSelectedDate, onEventPress,
-}: {
-  events: Event[];
-  month: { y: number; m: number };
-  setMonth: (m: { y: number; m: number }) => void;
-  selectedDate: string | null;
-  setSelectedDate: (d: string | null) => void;
-  onEventPress: (id: string) => void;
-}) {
-  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
-  const firstDay = new Date(month.y, month.m, 1).getDay();
-  const offset = (firstDay + 6) % 7; // Make Monday first
+  events, onEventPress,
+}: { events: Event[]; onEventPress: (id: string) => void }) {
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
-    events.forEach((e) => {
-      (map[e.date] ??= []).push(e);
-    });
+    events.forEach((e) => { (map[e.date] ??= []).push(e); });
     return map;
   }, [events]);
+
+  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
+  const firstDay = new Date(month.y, month.m, 1).getDay();
+  const offset = (firstDay + 6) % 7;
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < offset; i++) cells.push(null);
@@ -169,26 +233,24 @@ function CalendarView({
   const dayKey = (d: number) =>
     `${month.y}-${String(month.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
+  const today = formatDate(new Date());
   const selectedEvents = selectedDate ? eventsByDate[selectedDate] ?? [] : [];
 
-  const prev = () => {
-    if (month.m === 0) setMonth({ y: month.y - 1, m: 11 });
-    else setMonth({ y: month.y, m: month.m - 1 });
-  };
-  const next = () => {
-    if (month.m === 11) setMonth({ y: month.y + 1, m: 0 });
-    else setMonth({ y: month.y, m: month.m + 1 });
-  };
-
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.calendarCard}>
       <View style={styles.monthNav}>
-        <TouchableOpacity onPress={prev} style={styles.navArrow}>
-          <Text style={styles.navArrowText}>‹</Text>
+        <TouchableOpacity
+          onPress={() => setMonth(month.m === 0 ? { y: month.y - 1, m: 11 } : { ...month, m: month.m - 1 })}
+          style={styles.navArrow}
+        >
+          <ChevronLeft size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.monthLabel}>{monthName}</Text>
-        <TouchableOpacity onPress={next} style={styles.navArrow}>
-          <Text style={styles.navArrowText}>›</Text>
+        <TouchableOpacity
+          onPress={() => setMonth(month.m === 11 ? { y: month.y + 1, m: 0 } : { ...month, m: month.m + 1 })}
+          style={styles.navArrow}
+        >
+          <ChevronRight size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -204,27 +266,44 @@ function CalendarView({
           const key = dayKey(d);
           const has = !!eventsByDate[key]?.length;
           const isSelected = key === selectedDate;
+          const isToday = key === today;
           return (
             <TouchableOpacity
               key={i}
-              style={[styles.cell, isSelected && styles.cellSelected]}
+              style={[
+                styles.cell,
+                isToday && styles.cellToday,
+                isSelected && styles.cellSelected,
+              ]}
               onPress={() => setSelectedDate(isSelected ? null : key)}
             >
-              <Text style={[styles.dayNum, isSelected && styles.dayNumSelected]}>{d}</Text>
-              {has && <View style={styles.dot} />}
+              <Text style={[
+                styles.dayNum,
+                isToday && { color: colors.primary, fontWeight: '700' },
+                isSelected && { color: colors.primaryFg, fontWeight: '700' },
+              ]}>{d}</Text>
+              {has && (
+                <View style={[
+                  styles.dot2,
+                  { backgroundColor: isSelected ? colors.primaryFg : colors.primary },
+                ]} />
+              )}
             </TouchableOpacity>
           );
         })}
       </View>
 
-      <View style={styles.calendarList}>
-        {selectedDate && selectedEvents.length === 0 && (
-          <Text style={styles.calendarEmpty}>В этот день игр нет</Text>
-        )}
-        {selectedEvents.map((e) => (
-          <EventCard key={e.id} event={e} onPress={() => onEventPress(e.id)} />
-        ))}
-      </View>
+      {selectedDate && (
+        <View style={styles.selectedList}>
+          {selectedEvents.length === 0 ? (
+            <Text style={styles.emptyText}>В этот день игр нет</Text>
+          ) : (
+            selectedEvents.map((e) => (
+              <EventListRow key={e.id} event={e} onPress={() => onEventPress(e.id)} />
+            ))
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -232,83 +311,76 @@ function CalendarView({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  topBar: { flexDirection: 'row', padding: 16, gap: 12 },
-  createBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-  },
-  createBtnText: { color: '#000', fontSize: 14, fontWeight: '600' },
-  modeSwitch: {
-    flex: 1,
+
+  toggle: {
     flexDirection: 'row',
-    backgroundColor: colors.bgCard,
-    borderRadius: 10,
-    padding: 3,
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    borderRadius: radii.lg,
+    padding: 4,
     borderWidth: 1,
     borderColor: colors.border,
+    alignSelf: 'flex-end',
+    marginBottom: 16,
   },
-  modeBtn: { flex: 1, paddingVertical: 7, borderRadius: 7, alignItems: 'center' },
-  modeBtnActive: { backgroundColor: colors.primary },
-  modeBtnText: { color: colors.textMuted, fontSize: 12 },
-  modeBtnTextActive: { color: '#000', fontWeight: '600' },
-  list: { paddingHorizontal: 16, paddingBottom: 24 },
-  empty: { alignItems: 'center', padding: 32 },
-  emptyText: { color: colors.textDim, fontSize: 14 },
-  card: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardHeader: {
+  toggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radii.md,
   },
-  cardTitle: { color: colors.text, fontSize: 16, fontWeight: '600', flex: 1, marginRight: 8 },
-  badge: {
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1,
-  },
-  badgeText: { fontSize: 11, fontWeight: '500' },
-  meta: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+  toggleBtnActive: { backgroundColor: colors.primary },
+  toggleText: { color: colors.textMuted, fontSize: 13, fontWeight: '500' },
+  toggleTextActive: { color: colors.primaryFg, fontWeight: '600' },
 
+  empty: { padding: 40, alignItems: 'center' },
+  emptyText: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
+
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.lg,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+  },
+  eventTitle: { color: colors.text, fontSize: 14, fontWeight: '500' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  metaText: { color: colors.textMuted, fontSize: 12 },
+  dot: { color: colors.textMuted, fontSize: 12 },
+
+  calendarCard: {
+    backgroundColor: colors.bgCard,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+  },
   monthNav: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 8,
-  },
-  navArrow: { padding: 6 },
-  navArrowText: { color: colors.primary, fontSize: 22 },
-  monthLabel: { color: colors.text, fontSize: 15, fontWeight: '600', textTransform: 'capitalize' },
-  weekdays: {
-    flexDirection: 'row',
     paddingHorizontal: 8,
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  weekday: { flex: 1, textAlign: 'center', color: colors.textDim, fontSize: 11 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8 },
+  navArrow: { padding: 6, borderRadius: radii.md },
+  monthLabel: { color: colors.text, fontSize: 15, fontWeight: '600', textTransform: 'capitalize' },
+  weekdays: { flexDirection: 'row', marginBottom: 4 },
+  weekday: { flex: 1, textAlign: 'center', color: colors.textMuted, fontSize: 11, fontWeight: '500' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: radii.md,
   },
+  cellToday: { backgroundColor: 'rgba(34,197,94,0.10)' },
   cellSelected: { backgroundColor: colors.primary },
-  dayNum: { color: colors.text, fontSize: 14 },
-  dayNumSelected: { color: '#000', fontWeight: '700' },
-  dot: {
-    width: 4, height: 4, borderRadius: 2,
-    backgroundColor: colors.primary,
-    position: 'absolute', bottom: 6,
-  },
-  calendarList: { paddingHorizontal: 16, paddingTop: 16 },
-  calendarEmpty: { color: colors.textDim, fontSize: 13, textAlign: 'center', padding: 16 },
+  dayNum: { color: colors.text, fontSize: 13 },
+  dot2: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 4 },
+  selectedList: { marginTop: 12, gap: 8 },
 });

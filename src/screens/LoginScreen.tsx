@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { api, setToken } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import { colors } from '../theme/colors';
+import { colors, radii } from '../theme/colors';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 type Mode = 'login' | 'register';
 
@@ -61,69 +62,62 @@ export default function LoginScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>Padix</Text>
+        <View style={styles.logoWrap}>
+          <Text style={styles.logo}>Padix</Text>
+          <Text style={styles.tagline}>Падел-теннис · Американка</Text>
+        </View>
+
+        <Card style={{ padding: 24 }}>
+          <Text style={styles.title}>
+            {mode === 'login' ? 'Вход в аккаунт' : 'Создание аккаунта'}
+          </Text>
           <Text style={styles.subtitle}>
-            {mode === 'login' ? 'Войдите в свой аккаунт' : 'Создайте аккаунт'}
+            {mode === 'login' ? 'Введите email и пароль' : 'Несколько шагов до игры'}
           </Text>
 
-          <View style={styles.modeRow}>
+          <View style={styles.modeSwitch}>
             <ModeBtn label="Вход" active={mode === 'login'} onPress={() => setMode('login')} />
             <ModeBtn label="Регистрация" active={mode === 'register'} onPress={() => setMode('register')} />
           </View>
 
           {mode === 'register' && (
-            <TextInput
-              style={styles.input}
-              placeholder="Имя"
-              placeholderTextColor={colors.textDim}
-              value={name}
-              onChangeText={setName}
-            />
+            <Input label="Имя" value={name} onChangeText={setName} placeholder="Иван" />
           )}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={colors.textDim}
-            autoCapitalize="none"
-            keyboardType="email-address"
+          <Input
+            label="Email"
             value={email}
             onChangeText={setEmail}
+            placeholder="you@example.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Пароль"
-            placeholderTextColor={colors.textDim}
-            secureTextEntry
+
+          <Input
+            label="Пароль"
             value={password}
             onChangeText={setPassword}
+            placeholder="••••••••"
+            secureTextEntry
           />
 
           {mode === 'register' && (
-            <View style={styles.genderRow}>
-              <GenderBtn label="М" active={gender === 'M'} onPress={() => setGender('M')} />
-              <GenderBtn label="Ж" active={gender === 'F'} onPress={() => setGender('F')} />
-              <GenderBtn label="Не указывать" active={gender === null} onPress={() => setGender(null)} />
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Пол</Text>
+              <View style={styles.genderRow}>
+                <GenderBtn label="М" active={gender === 'M'} onPress={() => setGender('M')} />
+                <GenderBtn label="Ж" active={gender === 'F'} onPress={() => setGender('F')} />
+                <GenderBtn label="Не указано" active={gender === null} onPress={() => setGender(null)} />
+              </View>
             </View>
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          <Button onPress={handleSubmit} loading={loading} fullWidth size="lg" style={{ marginTop: 8 }}>
+            {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+          </Button>
+        </Card>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -147,72 +141,42 @@ function GenderBtn({ label, active, onPress }: { label: string; active: boolean;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  card: {
-    backgroundColor: colors.bgCard,
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: {
-    color: colors.primary,
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  modeRow: {
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+
+  logoWrap: { alignItems: 'center', marginBottom: 24 },
+  logo: { color: colors.primary, fontSize: 42, fontWeight: '800', letterSpacing: -1 },
+  tagline: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+
+  title: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  subtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 18 },
+
+  modeSwitch: {
     flexDirection: 'row',
-    backgroundColor: colors.bgElevated,
-    borderRadius: 10,
-    padding: 4,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.secondary,
+    borderRadius: radii.md,
+    padding: 3,
+    marginBottom: 18,
   },
-  modeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 7 },
+  modeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radii.sm },
   modeBtnActive: { backgroundColor: colors.bgCard },
   modeBtnText: { color: colors.textMuted, fontSize: 13 },
   modeBtnTextActive: { color: colors.text, fontWeight: '600' },
-  input: {
-    backgroundColor: colors.bgElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  genderRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+
+  fieldWrap: { marginBottom: 14 },
+  label: { color: colors.textMuted, fontSize: 13, marginBottom: 6 },
+  genderRow: { flexDirection: 'row', gap: 8 },
   genderBtn: {
     flex: 1,
-    backgroundColor: colors.bgElevated,
-    borderRadius: 10,
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    borderRadius: radii.md,
     paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  genderBtnActive: { borderColor: colors.primary },
-  genderBtnText: { color: colors.textMuted, fontSize: 12 },
+  genderBtnActive: { borderColor: colors.primary, backgroundColor: 'rgba(34,197,94,0.10)' },
+  genderBtnText: { color: colors.textMuted, fontSize: 13 },
   genderBtnTextActive: { color: colors.primary, fontWeight: '600' },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, marginBottom: 8, textAlign: 'center' },
+
+  error: { color: colors.danger, fontSize: 13, textAlign: 'center', marginBottom: 8 },
 });

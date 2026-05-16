@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import {
-  ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../api/client';
 import type { PairingMode } from '../api/types';
-import { colors } from '../theme/colors';
+import { colors, radii } from '../theme/colors';
 import { DateField, TimeField } from '../components/DateTimeField';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 function todayStr(): string {
   const d = new Date();
@@ -66,147 +69,131 @@ export default function CreateEventScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Field label="Название" value={title} onChangeText={setTitle} placeholder="Вечерняя игра" />
-      <DateField label="Дата" value={date} onChange={setDate} />
-      <Row>
-        <TimeField label="Старт" value={startTime} onChange={setStartTime} />
-        <TimeField label="Конец" value={endTime} onChange={setEndTime} />
-      </Row>
-      <Row>
-        <Field
-          label="Кортов"
-          value={courtsCount}
-          onChangeText={(v) => {
-            setCourtsCount(v);
-            const cc = parseInt(v, 10) || 0;
-            setCourtNames((prev) => {
-              const next = [...prev];
-              while (next.length < cc) next.push('');
-              return next.slice(0, cc);
-            });
-          }}
-          keyboardType="number-pad"
-          half
-        />
-        <Field label="Раундов" value={roundsPlanned} onChangeText={setRoundsPlanned} keyboardType="number-pad" half />
-      </Row>
-
-      <Text style={styles.label}>Имена кортов (необязательно)</Text>
-      {Array.from({ length: parseInt(courtsCount, 10) || 0 }).map((_, i) => (
-        <View key={i} style={[styles.fieldWrap, { marginBottom: 8 }]}>
-          <TextInput
-            style={styles.input}
-            placeholder={`Корт ${i + 1}`}
-            placeholderTextColor={colors.textDim}
-            value={courtNames[i] ?? ''}
-            onChangeText={(v) => setCourtNames((p) => p.map((x, j) => (j === i ? v : x)))}
-          />
-        </View>
-      ))}
-      <Field
-        label="Очков на игрока в матче"
-        value={pointsPerMatch}
-        onChangeText={setPointsPerMatch}
-        keyboardType="number-pad"
-      />
-
-      <Text style={styles.label}>Режим распределения</Text>
-      <View style={styles.segment}>
-        <SegmentBtn
-          active={pairingMode === 'ROUND_ROBIN'}
-          label="Каждый с каждым"
-          onPress={() => setPairingMode('ROUND_ROBIN')}
-        />
-        <SegmentBtn
-          active={pairingMode === 'BALANCED'}
-          label="Равный бой"
-          onPress={() => setPairingMode('BALANCED')}
-        />
-      </View>
-
-      {error && <Text style={styles.error}>{error}</Text>}
-
-      <TouchableOpacity
-        style={[styles.submit, submitting && { opacity: 0.6 }]}
-        onPress={handleSubmit}
-        disabled={submitting}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
       >
-        {submitting ? <ActivityIndicator color="#000" /> : <Text style={styles.submitText}>Создать игру</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+        <PageHeader title="Новая игра" subtitle="Создайте игру за минуту" />
+
+        <Card style={{ padding: 16, gap: 4 }}>
+          <Text style={styles.section}>Основное</Text>
+          <Input label="Название" value={title} onChangeText={setTitle} placeholder="Вечерняя игра" />
+          <DateField label="Дата" value={date} onChange={setDate} />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TimeField label="Старт" value={startTime} onChange={setStartTime} />
+            <TimeField label="Конец" value={endTime} onChange={setEndTime} />
+          </View>
+        </Card>
+
+        <Card style={{ padding: 16, marginTop: 12, gap: 4 }}>
+          <Text style={styles.section}>Корты и раунды</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Кортов"
+                value={courtsCount}
+                keyboardType="number-pad"
+                onChangeText={(v) => {
+                  setCourtsCount(v);
+                  const cc = parseInt(v, 10) || 0;
+                  setCourtNames((prev) => {
+                    const next = [...prev];
+                    while (next.length < cc) next.push('');
+                    return next.slice(0, cc);
+                  });
+                }}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Раундов"
+                value={roundsPlanned}
+                keyboardType="number-pad"
+                onChangeText={setRoundsPlanned}
+              />
+            </View>
+          </View>
+
+          {Array.from({ length: parseInt(courtsCount, 10) || 0 }).map((_, i) => (
+            <Input
+              key={i}
+              placeholder={`Имя корта ${i + 1} (необязательно)`}
+              value={courtNames[i] ?? ''}
+              onChangeText={(v) => setCourtNames((p) => p.map((x, j) => (j === i ? v : x)))}
+            />
+          ))}
+        </Card>
+
+        <Card style={{ padding: 16, marginTop: 12, gap: 4 }}>
+          <Text style={styles.section}>Очки и режим</Text>
+          <Input
+            label="Очков на игрока в матче"
+            value={pointsPerMatch}
+            keyboardType="number-pad"
+            onChangeText={setPointsPerMatch}
+            hint="Сумма очков обеих команд = очков × 4"
+          />
+
+          <Text style={styles.label}>Режим распределения пар</Text>
+          <View style={styles.segment}>
+            <SegBtn
+              active={pairingMode === 'ROUND_ROBIN'}
+              label="Каждый с каждым"
+              onPress={() => setPairingMode('ROUND_ROBIN')}
+            />
+            <SegBtn
+              active={pairingMode === 'BALANCED'}
+              label="Равный бой"
+              onPress={() => setPairingMode('BALANCED')}
+            />
+          </View>
+        </Card>
+
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        <Button size="lg" fullWidth onPress={handleSubmit} loading={submitting} style={{ marginTop: 16 }}>
+          Создать игру
+        </Button>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-function Field({
-  label, half, ...props
-}: { label: string; half?: boolean } & React.ComponentProps<typeof TextInput>) {
-  return (
-    <View style={[styles.fieldWrap, half && { flex: 1 }]}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        {...props}
-        style={styles.input}
-        placeholderTextColor={colors.textDim}
-        autoCapitalize="none"
-      />
-    </View>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', gap: 10 }}>{children}</View>;
-}
-
-function SegmentBtn({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+function SegBtn({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
     <TouchableOpacity
-      style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+      style={[styles.segBtn, active && styles.segBtnActive]}
       onPress={onPress}
     >
-      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+      <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  fieldWrap: { marginBottom: 14 },
-  label: { color: colors.textMuted, fontSize: 13, marginBottom: 6 },
-  input: {
-    backgroundColor: colors.bgCard,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    color: colors.text,
-    fontSize: 15,
+  section: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
+  label: { color: colors.textMuted, fontSize: 13, marginBottom: 6, marginTop: 4 },
   segment: {
     flexDirection: 'row',
-    backgroundColor: colors.bgCard,
-    borderRadius: 10,
-    padding: 4,
+    backgroundColor: 'rgba(54,54,54,0.3)',
+    borderRadius: radii.md,
+    padding: 3,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 18,
   },
-  segmentBtn: { flex: 1, paddingVertical: 10, borderRadius: 7, alignItems: 'center' },
-  segmentBtnActive: { backgroundColor: colors.primary },
-  segmentText: { color: colors.textMuted, fontSize: 13 },
-  segmentTextActive: { color: '#000', fontWeight: '600' },
-  submit: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitText: { color: '#000', fontSize: 16, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, textAlign: 'center', marginBottom: 12 },
+  segBtn: { flex: 1, paddingVertical: 10, borderRadius: radii.sm, alignItems: 'center' },
+  segBtnActive: { backgroundColor: colors.primary },
+  segText: { color: colors.textMuted, fontSize: 13 },
+  segTextActive: { color: colors.primaryFg, fontWeight: '600' },
+  error: { color: colors.danger, fontSize: 13, textAlign: 'center', marginTop: 12 },
 });
