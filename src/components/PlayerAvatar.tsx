@@ -1,5 +1,8 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
+
+const BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
 
 export default function PlayerAvatar({
   name, avatarUrl, size = 28,
@@ -11,7 +14,14 @@ export default function PlayerAvatar({
       { width: size, height: size, borderRadius: size / 2 },
     ]}>
       {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={{ width: size, height: size }} />
+        <Image
+          source={{ uri: avatarUrl }}
+          style={{ width: size, height: size }}
+          contentFit="cover"
+          placeholder={BLURHASH}
+          transition={200}
+          cachePolicy="memory-disk"
+        />
       ) : (
         <Text style={[styles.initial, { fontSize: size * 0.45 }]}>{initial}</Text>
       )}
@@ -21,7 +31,7 @@ export default function PlayerAvatar({
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

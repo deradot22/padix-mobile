@@ -1,21 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from '@gorhom/bottom-sheet';
 import {
-  ChevronDown, ChevronUp, Crown, Flag, Plus, Trash2, X,
+  ChevronDown, ChevronUp, Crown, Flag, Plus, X,
 } from 'lucide-react-native';
 import { api } from '../api/client';
 import type { EventDetails, Match, Round } from '../api/types';
 import { colors, radii } from '../theme/colors';
 import { Button } from './ui/Button';
 import PlayerAvatar from './PlayerAvatar';
+import { haptic } from '../lib/haptics';
+import { showToast } from '../lib/toast';
 
 type Props = {
   visible: boolean;
@@ -30,106 +34,143 @@ type Props = {
 export default function RoundsModal({
   visible, onClose, eventId, data, isAuthor, pointsPerPlayer, onChanged,
 }: Props) {
+  const sheetRef = useRef<BottomSheet>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const snapPoints = useMemo(() => ['90%'], []);
+
   useEffect(() => {
-    if (!data || !visible) return;
-    // Auto-expand the active (or last) round
+    if (visible) sheetRef.current?.snapToIndex(0);
+    else sheetRef.current?.close();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!data) return;
     const active = data.rounds.find((r) => r.matches.some((m) => m.status !== 'FINISHED'));
     setExpandedId(active?.id ?? data.rounds[data.rounds.length - 1]?.id ?? null);
-  }, [data, visible]);
+  }, [data]);
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.7}
+      />
+    ),
+    [],
+  );
 
   if (!data) return null;
   const e = data.event;
   const inProgress = e.status === 'IN_PROGRESS';
 
-  const handle = async (fn: () => Promise<unknown>) => {
+  const handle = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(true);
-    try { await fn(); onChanged(); } finally { setBusy(false); }
+    try {
+      await fn();
+      onChanged();
+      showToast.success(`${label} — готово`);
+    } catch (err: any) {
+      showToast.error(label, err?.message ?? 'Ошибка');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <View style={{ width: 28 }} />
-            <Text style={styles.title}>Раунды</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <X size={22} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-            {data.rounds.map((round) => {
-              const finished = round.matches.every((m) => m.status === 'FINISHED');
-              const isExpanded = expandedId === round.id;
-              const isActive = !finished && inProgress;
-              return (
-                <RoundCard
-                  key={round.id}
-                  round={round}
-                  expanded={isExpanded}
-                  active={isActive}
-                  finished={finished}
-                  isAuthor={isAuthor}
-                  pointsPerPlayer={pointsPerPlayer}
-                  onToggle={() => setExpandedId(isExpanded ? null : round.id)}
-                  onDelete={() => handle(() => api.deleteRound(eventId, round.id))}
-                  onNext={() => {
-                    const nextRound = data.rounds.find((r) => r.roundNumber === round.roundNumber + 1);
-                    if (nextRound) setExpandedId(nextRound.id);
-                  }}
-                />
-              );
-            })}
-
-            {isAuthor && inProgress && (
-              <View style={styles.footerActions}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => handle(() => api.addRound(eventId))}
-                    disabled={busy}
-                    leftIcon={<Plus size={14} color={colors.text} />}
-                    style={{ flex: 1 }}
-                  >
-                    Раунд
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => handle(() => api.addFinalRound(eventId))}
-                    disabled={busy}
-                    leftIcon={<Crown size={14} color={colors.warningFg} />}
-                    style={{ flex: 1 }}
-                  >
-                    Финальный раунд
-                  </Button>
-                </View>
-                <Button
-                  variant="destructive"
-                  fullWidth
-                  onPress={() => handle(() => api.finishEvent(eventId))}
-                  disabled={busy}
-                  leftIcon={<Flag size={14} color="#fff" />}
-                  style={{ marginTop: 8 }}
-                >
-                  Завершить игру
-                </Button>
-              </View>
-            )}
-          </ScrollView>
-        </View>
+    <BottomSheet
+      ref={sheetRef}
+      index={visible ? 0 : -1}
+      snapPoints={snapPoints}
+      enablePanDownToClose
+      onClose={onClose}
+      backdropComponent={renderBackdrop}
+      backgroundStyle={{ backgroundColor: colors.bgCard }}
+      handleIndicatorStyle={{ backgroundColor: colors.border, width: 40 }}
+    >
+      <View style={styles.header}>
+        <View style={{ width: 28 }} />
+        <Text style={styles.title}>Раунды</Text>
+        <TouchableOpacity onPress={onClose} hitSlop={10}>
+          <X size={22} color={colors.textMuted} />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      <BottomSheetScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}>
+        {data.rounds.map((round) => {
+          const finished = round.matches.every((m) => m.status === 'FINISHED');
+          const isExpanded = expandedId === round.id;
+          const isActive = !finished && inProgress;
+          return (
+            <RoundCard
+              key={round.id}
+              round={round}
+              expanded={isExpanded}
+              active={isActive}
+              finished={finished}
+              isAuthor={isAuthor}
+              pointsPerPlayer={pointsPerPlayer}
+              onToggle={() => {
+                haptic.select();
+                setExpandedId(isExpanded ? null : round.id);
+              }}
+              onDelete={() => handle('Удалить раунд', () => api.deleteRound(eventId, round.id))}
+              onNext={() => {
+                const nextRound = data.rounds.find((r) => r.roundNumber === round.roundNumber + 1);
+                if (nextRound) {
+                  haptic.light();
+                  setExpandedId(nextRound.id);
+                }
+              }}
+              onScored={onChanged}
+            />
+          );
+        })}
+
+        {isAuthor && inProgress && (
+          <View style={{ marginTop: 8, gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button
+                variant="outline"
+                onPress={() => handle('Раунд добавлен', () => api.addRound(eventId))}
+                disabled={busy}
+                leftIcon={<Plus size={14} color={colors.text} />}
+                style={{ flex: 1 }}
+              >
+                Раунд
+              </Button>
+              <Button
+                variant="outline"
+                onPress={() => handle('Финальный раунд', () => api.addFinalRound(eventId))}
+                disabled={busy}
+                leftIcon={<Crown size={14} color={colors.warningFg} />}
+                style={{ flex: 1 }}
+              >
+                Финал
+              </Button>
+            </View>
+            <Button
+              variant="destructive"
+              fullWidth
+              onPress={() => handle('Игра завершена', () => api.finishEvent(eventId))}
+              disabled={busy}
+              leftIcon={<Flag size={14} color="#fff" />}
+              hapticType="warning"
+            >
+              Завершить игру
+            </Button>
+          </View>
+        )}
+      </BottomSheetScrollView>
+    </BottomSheet>
   );
 }
 
 function RoundCard({
-  round, expanded, active, finished, isAuthor, pointsPerPlayer, onToggle, onDelete, onNext,
+  round, expanded, active, finished, isAuthor, pointsPerPlayer, onToggle, onDelete, onNext, onScored,
 }: {
   round: Round;
   expanded: boolean;
@@ -140,6 +181,7 @@ function RoundCard({
   onToggle: () => void;
   onDelete: () => void;
   onNext: () => void;
+  onScored: () => void;
 }) {
   return (
     <View style={[styles.roundCard, expanded && styles.roundCardExpanded]}>
@@ -163,7 +205,7 @@ function RoundCard({
       {expanded && (
         <View style={{ marginTop: 10, gap: 10 }}>
           {round.matches.map((m) => (
-            <MatchCard key={m.id} match={m} pointsPerPlayer={pointsPerPlayer} />
+            <MatchCard key={m.id} match={m} pointsPerPlayer={pointsPerPlayer} onScored={onScored} />
           ))}
           {!finished && active && (
             <View style={{ alignItems: 'flex-end' }}>
@@ -178,7 +220,9 @@ function RoundCard({
   );
 }
 
-function MatchCard({ match, pointsPerPlayer }: { match: Match; pointsPerPlayer: number }) {
+function MatchCard({
+  match, pointsPerPlayer, onScored,
+}: { match: Match; pointsPerPlayer: number; onScored: () => void }) {
   const [selectedTeam, setSelectedTeam] = useState<'A' | 'B' | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const expectedTotal = pointsPerPlayer * 4;
@@ -190,12 +234,17 @@ function MatchCard({ match, pointsPerPlayer }: { match: Match; pointsPerPlayer: 
   const teamBWon = finished && teamBPoints > teamAPoints;
 
   const submitScore = async (value: number) => {
+    haptic.medium();
     const a = selectedTeam === 'A' ? value : expectedTotal - value;
     const b = selectedTeam === 'A' ? expectedTotal - value : value;
     setSubmitting(true);
     try {
       await api.submitScore(match.id, { points: { teamAPoints: a, teamBPoints: b } });
+      showToast.success(`Счёт: ${a} : ${b}`);
       setSelectedTeam(null);
+      onScored();
+    } catch (err: any) {
+      showToast.error('Не удалось сохранить', err?.message);
     } finally {
       setSubmitting(false);
     }
@@ -212,7 +261,10 @@ function MatchCard({ match, pointsPerPlayer }: { match: Match; pointsPerPlayer: 
           selected={selectedTeam === 'A'}
           won={teamAWon}
           finished={finished}
-          onPress={() => setSelectedTeam(selectedTeam === 'A' ? null : 'A')}
+          onPress={() => {
+            haptic.select();
+            setSelectedTeam(selectedTeam === 'A' ? null : 'A');
+          }}
         />
         <TeamBox
           team={match.teamB}
@@ -220,7 +272,10 @@ function MatchCard({ match, pointsPerPlayer }: { match: Match; pointsPerPlayer: 
           selected={selectedTeam === 'B'}
           won={teamBWon}
           finished={finished}
-          onPress={() => setSelectedTeam(selectedTeam === 'B' ? null : 'B')}
+          onPress={() => {
+            haptic.select();
+            setSelectedTeam(selectedTeam === 'B' ? null : 'B');
+          }}
         />
       </View>
 
@@ -233,6 +288,7 @@ function MatchCard({ match, pointsPerPlayer }: { match: Match; pointsPerPlayer: 
                 style={styles.numBtn}
                 onPress={() => submitScore(n)}
                 disabled={submitting}
+                activeOpacity={0.7}
               >
                 <Text style={styles.numBtnText}>{n}</Text>
               </TouchableOpacity>
@@ -267,7 +323,7 @@ function TeamBox({
     <TouchableOpacity
       style={[
         styles.teamBox,
-        highlighted && { borderColor: colors.primary, backgroundColor: 'rgba(34,197,94,0.06)' },
+        highlighted && { borderColor: colors.primary, backgroundColor: 'rgba(34,197,94,0.08)' },
       ]}
       onPress={onPress}
       activeOpacity={0.8}
@@ -289,22 +345,12 @@ function TeamBox({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.bgCard,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    minHeight: '70%',
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -349,17 +395,12 @@ const styles = StyleSheet.create({
   teamGrid: { alignItems: 'center', gap: 4 },
   teamPlayer: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'stretch' },
   playerName: { color: colors.text, fontSize: 11, flex: 1 },
-  scoreText: { color: colors.text, fontSize: 24, fontWeight: '700', marginVertical: 6 },
+  scoreText: { color: colors.text, fontSize: 26, fontWeight: '800', marginVertical: 6 },
 
-  numpad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 12,
-  },
+  numpad: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   numBtn: {
     width: 44,
-    height: 36,
+    height: 38,
     borderRadius: radii.md,
     backgroundColor: 'rgba(54,54,54,0.40)',
     borderWidth: 1,
@@ -377,6 +418,4 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   nextRoundText: { color: colors.primaryFg, fontSize: 13, fontWeight: '600' },
-
-  footerActions: { marginTop: 8 },
 });

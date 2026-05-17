@@ -21,6 +21,8 @@ import SurveyScreen from '../screens/SurveyScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import HomeScreen from '../screens/HomeScreen';
 import RatingNotificationModal from '../components/RatingNotificationModal';
+import BlurTabBarBackground from '../components/BlurTabBar';
+import { Platform } from 'react-native';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -58,11 +60,19 @@ function MainTabs() {
     <Tabs.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.bgCard,
-          borderTopColor: colors.border,
-          paddingTop: 6,
-        },
+        tabBarStyle: Platform.OS === 'ios'
+          ? {
+              position: 'absolute',
+              backgroundColor: 'transparent',
+              borderTopColor: 'rgba(71,71,71,0.6)',
+              paddingTop: 6,
+            }
+          : {
+              backgroundColor: colors.bgCard,
+              borderTopColor: colors.border,
+              paddingTop: 6,
+            },
+        tabBarBackground: () => <BlurTabBarBackground />,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },

@@ -18,6 +18,8 @@ import {
   TrendingUp, Trophy, UserPlus, Users, LogOut,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type {
@@ -127,9 +129,12 @@ export default function ProfileScreen() {
 
       {/* Profile card with cover banner */}
       <View style={styles.profileCard}>
-        <View style={styles.cover}>
-          <View style={styles.coverGradient} />
-        </View>
+        <LinearGradient
+          colors={['rgba(34,197,94,0.35)', 'rgba(34,197,94,0.10)', 'rgba(34,197,94,0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.cover}
+        />
 
         <View style={styles.profileBody}>
           <View style={styles.identityRow}>
@@ -139,7 +144,13 @@ export default function ProfileScreen() {
               disabled={busyAvatar}
             >
               {user?.avatarUrl ? (
-                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+                <Image
+                  source={{ uri: user.avatarUrl }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
               ) : (
                 <Text style={styles.avatarInitial}>
                   {(user?.name?.trim()?.[0] ?? '?').toUpperCase()}

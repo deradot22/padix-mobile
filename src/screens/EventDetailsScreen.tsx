@@ -25,6 +25,9 @@ import { SectionCard } from '../components/ui/SectionCard';
 import ParticipantsGrid from '../components/ParticipantsGrid';
 import RoundsModal from '../components/RoundsModal';
 import InviteFriendsModal from '../components/InviteFriendsModal';
+import { AnimatedCard } from '../components/ui/AnimatedCard';
+import { showToast } from '../lib/toast';
+import { haptic } from '../lib/haptics';
 
 type EventRouteParams = {
   EventDetails: { eventId: string };
@@ -91,13 +94,14 @@ export default function EventDetailsScreen() {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  const action = async (label: string, fn: () => Promise<unknown>) => {
+  const action = async (label: string, fn: () => Promise<unknown>, successMsg?: string) => {
     setBusy(true);
     try {
       await fn();
       await load();
+      showToast.success(successMsg ?? `${label} — готово`);
     } catch (e: any) {
-      Alert.alert(label, e?.message ?? 'Ошибка');
+      showToast.error(label, e?.message ?? 'Ошибка');
     } finally {
       setBusy(false);
     }
@@ -149,6 +153,7 @@ export default function EventDetailsScreen() {
         </TouchableOpacity>
 
         {/* Hero card */}
+        <AnimatedCard>
         <View style={[styles.hero, inProgress && styles.heroActive]}>
           <View style={styles.heroPills}>
             {statusPill(e.status)}
@@ -272,6 +277,8 @@ export default function EventDetailsScreen() {
             )}
           </View>
         </View>
+
+        </AnimatedCard>
 
         {/* Compact info bar */}
         <View style={styles.infoBar}>
