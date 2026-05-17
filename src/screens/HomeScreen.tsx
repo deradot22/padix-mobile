@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Calendar, ChevronRight, Gamepad2, Sparkles, TrendingUp, Trophy, Users,
 } from 'lucide-react-native';
@@ -39,6 +40,7 @@ function todayStr(): string {
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -75,7 +77,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 20, paddingBottom: 60, gap: 14 }}
+      contentContainerStyle={{ padding: 20, paddingTop: insets.top + 12, paddingBottom: 24, gap: 14 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

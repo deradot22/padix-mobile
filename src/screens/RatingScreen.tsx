@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Trophy, TrendingUp, Users } from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +42,7 @@ const NTRP_COLOR: Record<string, string> = {
 };
 
 export default function RatingScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function RatingScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 20, paddingTop: insets.top + 12, paddingBottom: 24 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

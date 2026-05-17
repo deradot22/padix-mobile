@@ -9,12 +9,14 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../api/client';
 import type { EventInviteItem } from '../api/types';
 import { colors } from '../theme/colors';
 
 export default function InvitesScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [invites, setInvites] = useState<EventInviteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,7 +65,7 @@ export default function InvitesScreen() {
       style={styles.container}
       data={invites}
       keyExtractor={(item) => item.eventId}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingTop: insets.top + 12 }]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft, Clock, MapPin, Pencil, Play, Square, Swords,
   Trash2, Trophy, UserPlus,
@@ -50,6 +51,7 @@ function shortDate(s: string): string {
 export default function EventDetailsScreen() {
   const route = useRoute<RouteProp<EventRouteParams, 'EventDetails'>>();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { eventId } = route.params;
 
@@ -127,7 +129,7 @@ export default function EventDetailsScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingTop: 60, paddingBottom: 40, gap: 12 }}
+        contentContainerStyle={{ padding: 16, paddingTop: insets.top + 12, paddingBottom: 40, gap: 12 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

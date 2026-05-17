@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Calendar, ChevronDown, ChevronRight, Clock, Gamepad2, Mail, Pencil,
   TrendingUp, Trophy, UserPlus, Users, LogOut,
@@ -37,6 +38,7 @@ const CALIBRATION_TARGET = 30;
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user, logout, refreshUser } = useAuth();
   const [history, setHistory] = useState<EventHistoryItem[]>([]);
   const [ratingHistory, setRatingHistory] = useState<RatingHistoryPoint[]>([]);
@@ -112,7 +114,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 20, paddingTop: insets.top + 12, paddingBottom: 24 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

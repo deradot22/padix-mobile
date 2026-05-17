@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Calendar, ChevronLeft, ChevronRight, Gamepad2, List, Plus, Users,
 } from 'lucide-react-native';
@@ -53,6 +54,7 @@ type ViewMode = 'list' | 'calendar';
 
 export default function GamesScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +102,7 @@ export default function GamesScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 20, paddingTop: insets.top + 12, paddingBottom: 24 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}

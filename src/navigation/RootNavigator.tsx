@@ -61,8 +61,6 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.bgCard,
           borderTopColor: colors.border,
-          height: 64,
-          paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarActiveTintColor: colors.primary,
